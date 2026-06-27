@@ -1,16 +1,17 @@
-# Instrucciones exactas — Recrear el diseño web «Guía Técnica ArcadeVS»
+# Instrucciones exactas — Recrear el diseño web «ArcadeVS»
 
-Documento de construcción del manual de sistema de diseño **ArcadeVS**: estética CRT de fósforo *sakura* (menú de juego PC‑98 + pantalla BIOS + noche de Hanami). Sigue estas instrucciones al pie de la letra para reproducir el diseño pixel por pixel.
+Documento de construcción del sistema de diseño **ArcadeVS**: estética CRT de fósforo *sakura* (menú de juego PC‑98 + pantalla BIOS). Sigue estas instrucciones al pie de la letra para reproducir el diseño pixel por pixel.
 
-> **Principio rector:** *todo es emisión de fósforo, no tinta*. Nada es plano: cada texto y cada borde emite un halo (bloom). La jerarquía se controla por **brillo**, no por peso. Esquinas rectas (radio 0), salvo el cristal CRT. Sin emoji: la iconografía son sprites pixel 7×7. Sin fuentes *sans*: solo pixel/monospace.
+> **Principio rector:** *todo es emisión de fósforo, no tinta*. Nada es plano: cada texto y cada borde emite un halo (bloom). La jerarquía se controla por **brillo**, no por peso. Esquinas rectas (radio 0) en todos los elementos sin excepción. Sin emoji: la iconografía son sprites pixel 7×7. Sin fuentes *sans*: solo pixel/monospace. **Todo el texto de la UI va en español y mayúsculas.**
 
 ---
 
 ## 1. Formato y andamiaje
 
-- **Tipo de archivo:** un único Design Component `Guía Técnica ArcadeVS.dc.html` (se abre directo en el navegador). Estructura: `<x-dc>` con un bloque `<helmet>` al inicio, el cuerpo de la plantilla con estilos **inline**, y una clase de lógica `class Component extends DCLogic`.
+- **Resolución de pantalla:** las vistas de autenticación son **desktop-first** — frame base de `1280 × 800 px`.
+- **Layout split-panel:** columna izquierda fija de `460 px` (hero/branding) + columna derecha `820 px` (formulario).
+- **Columna de formulario:** el contenido se centra horizontalmente dentro del panel derecho en un contenedor de `420 px` de ancho.
 - **Estilos:** siempre inline (`style="…"`). En `<helmet><style>` solo viven los tokens `:root`, los temas `[data-theme]`, los `@keyframes`, el reset de `body` y el `<link>` de fuentes.
-- **Ancho del documento:** columna central `max-width:880px; margin:0 auto; padding:60px 36px 130px`, sobre fondo CRT oscuro, con overlays fijos de scanlines + viñeta + barrido.
 
 ### Cabeza del documento (`<helmet>`)
 
@@ -27,120 +28,176 @@ Documento de construcción del manual de sistema de diseño **ArcadeVS**: estét
 Crea **siempre** contra las variables, nunca contra el hexadecimal crudo. La paleta por defecto es **Sakura**. Los temas se activan con `document.documentElement.setAttribute('data-theme','amber'|'blue')` (Sakura = sin atributo).
 
 ```css
-:root{                          /* SAKURA (por defecto) */
-  --bg-screen:#1a0510; --bg-panel:#240a18; --bg-panel-2:#2e0e22;
-  --phosphor-pink:#ff8fb1; --petal-white:#ffe4ec; --neon-pink:#ff4d8f;
-  --celadon:#a8d8a8; --pink-dim:#c46a86; --pink-faint:#7a3e52;
-  --glow-neon:255,77,143; --glow-pink:255,143,177; --glow-cel:168,216,168;
-  --border:rgba(255,77,143,.26);
+:root {                          /* SAKURA (por defecto) */
+  --bg-screen:  #1a0510;
+  --bg-panel:   #240a18;
+  --bg-panel-2: #2e0e22;
+  --bg-left:    #240a12;   /* panel izquierdo hero */
+  --phosphor-pink: #ff8fb1;
+  --petal-white:   #ffe4ec;
+  --neon-pink:     #ff4d8f;
+  --celadon:       #a8d8a8;
+  --pink-dim:      #c46a86;
+  --pink-faint:    #7a3e52;
+  --glow-neon:  255,77,143;
+  --glow-pink:  255,143,177;
+  --glow-cel:   168,216,168;
+  --border: rgba(255,77,143,.26);
 }
-[data-theme="amber"]{          /* DARK AMBER */
-  --bg-screen:#180e02; --bg-panel:#231603; --bg-panel-2:#2c1d06;
-  --phosphor-pink:#ffcf8f; --petal-white:#fff1da; --neon-pink:#ff9e2e;
-  --celadon:#9fd6c2; --pink-dim:#c39a5a; --pink-faint:#6f5226;
-  --glow-neon:255,158,46; --glow-pink:255,207,143; --glow-cel:159,214,194;
-  --border:rgba(255,158,46,.26);
+
+[data-theme="amber"] {           /* DARK AMBER */
+  --bg-screen:  #180e02;
+  --bg-panel:   #231603;
+  --bg-panel-2: #2c1d06;
+  --bg-left:    #231302;
+  --phosphor-pink: #ffcf8f;
+  --petal-white:   #fff1da;
+  --neon-pink:     #ff9e2e;
+  --celadon:       #9fd6c2;
+  --pink-dim:      #c39a5a;
+  --pink-faint:    #6f5226;
+  --glow-neon:  255,158,46;
+  --glow-pink:  255,207,143;
+  --glow-cel:   159,214,194;
+  --border: rgba(255,158,46,.26);
 }
-[data-theme="blue"]{           /* ELECTRIC BLUE */
-  --bg-screen:#02101a; --bg-panel:#06192a; --bg-panel-2:#0a2438;
-  --phosphor-pink:#8fcaff; --petal-white:#dcefff; --neon-pink:#3da6ff;
-  --celadon:#86e0bf; --pink-dim:#5a96c4; --pink-faint:#26506f;
-  --glow-neon:61,166,255; --glow-pink:143,202,255; --glow-cel:134,224,191;
-  --border:rgba(61,166,255,.26);
+
+[data-theme="blue"] {            /* ELECTRIC BLUE */
+  --bg-screen:  #02101a;
+  --bg-panel:   #06192a;
+  --bg-panel-2: #0a2438;
+  --bg-left:    #061522;
+  --phosphor-pink: #8fcaff;
+  --petal-white:   #dcefff;
+  --neon-pink:     #3da6ff;
+  --celadon:       #86e0bf;
+  --pink-dim:      #5a96c4;
+  --pink-faint:    #26506f;
+  --glow-neon:  61,166,255;
+  --glow-pink:  143,202,255;
+  --glow-cel:   134,224,191;
+  --border: rgba(61,166,255,.26);
 }
 ```
 
 **Roles (jerarquía por brillo):**
-- `--petal-white` → énfasis máximo (texto que «brilla más»).
+- `--petal-white` → énfasis máximo (títulos principales de pantalla).
 - `--phosphor-pink` → texto primario / cuerpo.
-- `--pink-dim` → secundario / descripciones.
-- `--pink-faint` → apagado / deshabilitado.
-- `--neon-pink` → activo / seleccionado / acentos, líneas de separación.
-- `--celadon` → acento de contraste (online, conteos, encabezados de torneo, el reloj).
-- Los tripletes `--glow-*` son los **componentes RGB** que alimentan `rgba(var(--glow-neon), …)` en sombras/halos, de modo que cada tema recolorea sus glows automáticamente.
+- `--pink-dim` → etiquetas de campo / subtítulos / texto secundario.
+- `--pink-faint` → deshabilitado / placeholders / notas de validación / footer.
+- `--neon-pink` → activo / seleccionado / acentos / marcador `!` obligatorio / botón primario / hero L2.
+- `--celadon` → email maskeado, display timer, botón `?` de ayuda, marcador `?` de leyenda.
+- `--bg-left` → fondo exclusivo del panel hero izquierdo.
+- Los tripletes `--glow-*` alimentan `rgba(var(--glow-neon), …)` en sombras y halos.
 
 ---
 
 ## 3. Tipografía
 
-Tres familias de Google Fonts (sustitutas de fuentes bitmap PC‑98/DOS no redistribuibles). **Ninguna sans en ninguna parte.**
+Tres familias de Google Fonts. **Ninguna sans en ninguna parte.**
 
 | Familia | Rol | Uso |
 |---|---|---|
-| `DotGothic16` | primaria | UI, cuerpo, nombres de filas |
-| `VT323` | terminal CRT | numéricos, temporizadores, códigos, ticker, código fuente |
-| `Silkscreen` (400/700) | display bitmap | logo y encabezados duros |
+| `DotGothic16` | primaria | UI, cuerpo |
+| `VT323` | terminal CRT | numéricos, temporizadores, botón `?` |
+| `Silkscreen` (400/700) | display bitmap | logo, títulos, etiquetas de campo, botones, hero |
 
-- **Reset:** `body{ font-family:'DotGothic16',monospace; color:var(--phosphor-pink); line-height:1.7; -webkit-font-smoothing:none; text-rendering:geometricPrecision; }`
-- **Tracking de mayúsculas (`--ls-caps`) ≈ `0.14em`** en etiquetas/botones; los títulos Silkscreen usan `letter-spacing:.10–.14em`.
-- **Escala** (1rem = 16px): micro 11 · xs 13 · sm 15 · base 16 · md 20 · lg 24 · xl 32 · 2xl 44. Interlineado generoso (1.6–1.85) porque las fuentes pixel lo piden.
+- **Reset:** `body { font-family:'DotGothic16',monospace; color:var(--phosphor-pink); line-height:1.7; -webkit-font-smoothing:none; text-rendering:geometricPrecision; }`
+- **Todo el texto de UI en mayúsculas** con `letter-spacing: 0.10–0.16em`.
+- **Escala de uso en pantallas de auth:**
+
+| Elemento | Familia | Tamaño | Color |
+|---|---|---|---|
+| Logo `ARCADEVS` | Silkscreen Bold | 28px | `--neon-pink` |
+| Hero L1 | Silkscreen Bold | 32–36px | `--petal-white` |
+| Hero L2 | Silkscreen Bold | 24–32px | `--neon-pink` |
+| Título de pantalla | Silkscreen Bold | 18–20px | `--petal-white` |
+| Subtítulo | Silkscreen | 9px | `--pink-dim` |
+| Etiqueta de campo | Silkscreen | 9–10px | `--pink-dim` |
+| Marcador `!` | Silkscreen Bold | 9px | `--neon-pink` |
+| Placeholder | Silkscreen | 10px | `--pink-faint` |
+| Botón texto | Silkscreen Bold | 10px | `--bg-screen` (selected) / `--phosphor-pink` (inactivo) |
+| Botón `?` | VT323 Bold | 13px | `--celadon` |
+| Footer | Silkscreen | 8px | `--pink-faint` |
+| Timer | Silkscreen Bold | 28px | `--neon-pink` |
 
 ---
 
 ## 4. Espaciado y rejilla
 
-Rejilla estricta de **4px**. Las regiones se separan con una **línea de neón de 1px**, no con espacios.
+Rejilla estricta de **4 px**. Las regiones se separan con una **línea de neón de 1 px con gradiente**, no con espacios en blanco.
 
 ```
 --sp-1:4px  --sp-2:8px  --sp-3:12px  --sp-4:16px  --sp-6:24px  --sp-8:32px
---line:1px  --bezel:4px  --ctl-h:40px (control)  28px (control sm)  --icon:24px
---radius:0  /* esquinas rectas */   --radius-soft:2px (solo chips)
+--line:1px
+--ctl-h-btn:40px   (BiosButton)
+--ctl-h-input:36px (InputField)
+--radius:0         (esquinas rectas absolutas, sin excepción)
 ```
 
-Escala de muestra (cuadros de neón con bloom): 4 · 8 · 16 · 24 · 32 · 48 · 64 px.
+**Medidas del formulario:**
+- `leftW = 460px` — ancho panel izquierdo
+- `formW = 420px` — ancho contenedor formulario
+- `formX = leftW + (rightW - formW) / 2 = 660px` — posición X del formulario
+- `fieldW = formW - 32px = 388px` — ancho campo full (deja 32px para botón `?`)
+- `halfW = (fieldW - 14px) / 2 = 187px` — ancho campo mitad (Nombre / Apellido), gap de 14px entre columnas
 
 ---
 
 ## 5. Efectos CRT (la firma de la marca)
 
-Animación **elegante y contenida**: las pantallas entran con fade‑up, las reglas se «dibujan» solas, un barrido brillante baja una vez al cargar. *Hover = se ilumina* (sube brillo/bloom), nunca oscurece ni encoge.
-
-### 5.1 Keyframes (en `<helmet><style>`)
+### 5.1 Keyframes
 
 ```css
-@keyframes scanDrift{0%{background-position:0 0}100%{background-position:0 6px}}
-@keyframes caretBlink{0%,48%{opacity:1}49%,100%{opacity:0}}
-@keyframes dotPulse{0%,100%{filter:drop-shadow(0 0 3px rgba(var(--glow-neon),.5));opacity:1}
-                    50%{filter:drop-shadow(0 0 9px rgba(var(--glow-neon),.95));opacity:.85}}
-@keyframes livePulse{0%,100%{opacity:1;text-shadow:0 0 10px rgba(var(--glow-neon),.7)}
-                     50%{opacity:.4;text-shadow:0 0 4px rgba(var(--glow-neon),.3)}}
-@keyframes sweepDown{0%{transform:translateY(-30vh);opacity:0}10%{opacity:1}
-                     100%{transform:translateY(130vh);opacity:0}}
-@keyframes flick{0%,100%{opacity:1}50%{opacity:.92}}
+@keyframes scanDrift  { 0%   { background-position:0 0 }   100% { background-position:0 6px } }
+@keyframes caretBlink { 0%,48% { opacity:1 } 49%,100% { opacity:0 } }
+@keyframes dotPulse   {
+  0%,100% { filter:drop-shadow(0 0 3px rgba(var(--glow-neon),.5)); opacity:1 }
+  50%     { filter:drop-shadow(0 0 9px rgba(var(--glow-neon),.95)); opacity:.85 }
+}
+@keyframes timerPulse {
+  0%,100% { opacity:1; text-shadow:0 0 12px rgba(var(--glow-neon),.8) }
+  50%     { opacity:.6; text-shadow:0 0 4px rgba(var(--glow-neon),.3) }
+}
+@keyframes sweepDown  {
+  0%   { transform:translateY(-30vh); opacity:0 }
+  10%  { opacity:1 }
+  100% { transform:translateY(130vh); opacity:0 }
+}
+@keyframes flick { 0%,100% { opacity:1 } 50% { opacity:.92 } }
 ```
 
-### 5.2 Overlays fijos (3 `<div>` justo tras `</helmet>`, antes de la columna)
+### 5.2 Overlays fijos
 
 ```html
-<!-- SCANLINES (animadas) -->
+<!-- SCANLINES -->
 <div style="position:fixed;inset:0;pointer-events:none;z-index:80;
   background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0px,rgba(0,0,0,0) 2px,rgba(0,0,0,.24) 3px,rgba(0,0,0,0) 4px);
-  animation:scanDrift 7s linear infinite;display:{{ scanOn }}"></div>
-<!-- VIÑETA / CURVATURA -->
+  animation:scanDrift 7s linear infinite"></div>
+<!-- VIÑETA -->
 <div style="position:fixed;inset:0;pointer-events:none;z-index:81;
-  background:radial-gradient(ellipse 110% 110% at 50% 50%,transparent 58%,rgba(0,0,0,.62) 100%);
-  display:{{ vignetteOn }}"></div>
+  background:radial-gradient(ellipse 110% 110% at 50% 50%,transparent 58%,rgba(0,0,0,.62) 100%)"></div>
 <!-- BARRIDO de carga (una sola vez) -->
 <div style="position:fixed;left:0;right:0;top:0;height:18vh;pointer-events:none;z-index:82;
   background:linear-gradient(rgba(var(--glow-pink),0),rgba(var(--glow-pink),.05),rgba(var(--glow-pink),0));
   animation:sweepDown 2.6s ease-out 1 forwards"></div>
 ```
 
-La columna de contenido lleva un parpadeo CRT muy sutil: `animation:flick 6s ease-in-out infinite`.
+### 5.3 Recetas de bloom
 
-### 5.3 Recetas de bloom (memorizar)
-
-- **Bloom de texto rosa:** `text-shadow:0 0 10px rgba(var(--glow-pink),.55), 0 0 24px rgba(var(--glow-neon),.3)`
-- **Bloom de borde:** `box-shadow:0 0 14px rgba(var(--glow-neon),.45), inset 0 0 14px rgba(var(--glow-neon),.18)`
-- **Halo de icono SVG:** `filter:drop-shadow(0 0 2px rgba(var(--glow-neon),.7))`
-- **Textura scanline local** (dentro de un panel CRT): `background-image:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(0,0,0,.26) 3px,transparent 4px)`
-- **Rejilla de pixel:** `background-image:linear-gradient(rgba(var(--glow-neon),.08) 1px,transparent 1px),linear-gradient(90deg,rgba(var(--glow-neon),.08) 1px,transparent 1px);background-size:6px 6px`
+- **Bloom de texto título:** `text-shadow:0 0 10px rgba(var(--glow-pink),.55), 0 0 24px rgba(var(--glow-neon),.3)`
+- **Bloom de borde/panel:** `box-shadow:0 0 14px rgba(var(--glow-neon),.45), inset 0 0 14px rgba(var(--glow-neon),.18)`
+- **Bloom botón primario:** `box-shadow:0 0 16px rgba(var(--glow-neon),.6)`
+- **Bloom timer:** `text-shadow:0 0 12px rgba(var(--glow-neon),.8)` + `animation:timerPulse 1.8s ease-in-out infinite`
+- **Viñeta panel izquierdo:** `background:radial-gradient(ellipse at 50% 50%, transparent 0%, transparent 55%, rgba(0,0,0,.72) 100%)`
+- **Separador horizontal:** `background:linear-gradient(90deg, transparent 0%, var(--neon-pink) 50%, transparent 100%)` — 1px alto, ancho `formW`
+- **Divisor vertical:** rect `1px × 800px` en `rgba(var(--glow-neon),.25)` + rect `6px × 800px` en `rgba(var(--glow-neon),.06)` como glow difuso
 
 ---
 
 ## 6. Iconografía — sprites pixel 7×7
 
-Sin icon‑font ni emoji. Cada glifo es una matriz 7×7 de `#`/`.` renderizada como SVG nítido (`shape-rendering:crispEdges`) con halo de fósforo. Mapa `GLYPHS` (definido en la clase de lógica):
+Sin icon-font ni emoji. Cada glifo es una matriz 7×7 renderizada como SVG (`shape-rendering:crispEdges`) con `filter:drop-shadow(0 0 2px rgba(var(--glow-neon),.7))`.
 
 ```js
 glyphs = {
@@ -151,171 +208,322 @@ glyphs = {
   crown:   ["#..#..#","#.###.#","#######","#######","#######","#######","......."],
   petal:   ["..#.#..",".#####.","#######","#######",".#####.","..###..","...#..."],
   clock:   ["..###..",".#...#.","#..#..#","#..###.","#.....#",".#...#.","..###.."],
-  star:    ["...#...","...#...",".#####.","..###..",".##.##.","##...##","......."]
+  star:    ["...#...","...#...",".#####.","..###..",".##.##.","##...##","......."],
 };
 ```
 
-Constructor del SVG (un `<rect>` 1×1 por cada `#`):
+Constructor del SVG — un `<rect>` 1×1 por cada `#`:
 
 ```js
 glyph(name, size, color, glow) {
   const rows = this.glyphs[name] || this.glyphs.pawn;
   const rects = [];
   rows.forEach((row, y) => row.split('').forEach((ch, x) => {
-    if (ch === '#') rects.push(React.createElement('rect',
-      { key: x+'-'+y, x, y, width: 1.02, height: 1.02, style: { fill: color } }));
+    if (ch === '#') rects.push(
+      React.createElement('rect', { key:`${x}-${y}`, x, y, width:1.02, height:1.02, style:{ fill:color } })
+    );
   }));
   return React.createElement('svg', {
-    width: size, height: size, viewBox: '0 0 7 7', shapeRendering: 'crispEdges',
-    style: { display:'block', flex:'0 0 auto', filter:'drop-shadow(0 0 2px rgba('+glow+',.7))' }
+    width:size, height:size, viewBox:'0 0 7 7', shapeRendering:'crispEdges',
+    style:{ display:'block', flex:'0 0 auto', filter:`drop-shadow(0 0 2px rgba(${glow},.7))` }
   }, rects);
 }
 ```
 
-Para añadir un glifo, extiende `GLYPHS` con otra matriz 7×7; mantenlo en rejilla y reconocible a 24–32px.
-
 ---
 
-## 7. Componentes — recetas exactas
+## 7. Componentes base — recetas exactas
 
-Todas las medidas son literales inline. Reutiliza estos patrones.
+### 7.1 BiosButton (4 estados)
 
-### 7.1 Encabezado de sección numerado
-```html
-<div style="display:flex;align-items:center;gap:14px;margin:64px 0 4px;flex-wrap:wrap">
-  <span style="font-family:'Silkscreen',monospace;font-size:18px;color:var(--bg-screen);
-    background:var(--neon-pink);padding:6px 9px;box-shadow:0 0 16px rgba(var(--glow-neon),.55)">02</span>
-  <h2 style="margin:0;font-family:'Silkscreen',monospace;font-size:25px;letter-spacing:.13em;
-    color:var(--phosphor-pink);text-shadow:0 0 10px rgba(var(--glow-pink),.55),0 0 24px rgba(var(--glow-neon),.3)">COLOR</h2>
-</div>
-<div style="height:1px;background:linear-gradient(90deg,var(--neon-pink),rgba(var(--glow-neon),0));
-  box-shadow:0 0 8px rgba(var(--glow-neon),.5);margin-bottom:26px"></div>
+Altura fija `40px`, radio `0`, ancho flexible.
+
+| Estado | Estilo |
+|---|---|
+| **Selected (primario)** | `background:var(--neon-pink); color:var(--bg-screen); border:1px solid var(--neon-pink); box-shadow:0 0 16px rgba(var(--glow-neon),.6)` + prefijo `► ` |
+| **Inactivo** | `background:var(--bg-panel-2); color:var(--phosphor-pink); border:1px solid var(--neon-pink)` |
+| **Disabled** | `color:var(--pink-faint); border-color:var(--pink-faint)` sin glow, `cursor:not-allowed` |
+
+- Texto: Silkscreen Bold 10px, centrado, `letter-spacing:.16em`
+- En hover sobre inactivo: `box-shadow` sube a `.6`, color a `--petal-white`
+
+### 7.2 InputField
+
+```
+Altura:      36px, radio 0
+Ancho:       fieldW (full) o halfW (media columna)
+Etiqueta:    Silkscreen 9–10px, --pink-dim, sobre la caja
+Marcador !:  Silkscreen Bold 9px, --neon-pink, 4px a la derecha de la etiqueta
+Caja:        background --bg-panel-2
+             border 1px solid rgba(var(--glow-neon),.35)
+             stroke-align: inside
+Placeholder: Silkscreen 10px, --pink-faint, padding-left 10px
+Botón ?:     28 × 36px, radio 0
+             background --bg-panel
+             border 1px solid rgba(var(--glow-cel),.55)
+             VT323 Bold 13px, --celadon, centrado
+             4px a la derecha de la caja de input
 ```
 
-### 7.2 Panel / ficha (contenedor base)
-`background:var(--bg-panel); border:1px solid var(--border); box-shadow:0 0 22px rgba(var(--glow-neon),.06), inset 0 0 40px rgba(0,0,0,.3); padding:24px`
+### 7.3 Leyenda de íconos
 
-### 7.3 Bloque de código (terminal)
-`background:var(--bg-screen); border-left:2px solid var(--neon-pink); box-shadow:0 0 14px rgba(var(--glow-neon),.05); padding:14px 16px; font-family:'VT323',monospace; font-size:16px; color:var(--phosphor-pink); line-height:1.6; overflow-x:auto` — escapa `<` `>` como `&lt;` `&gt;`.
+Fila horizontal alineada al borde izquierdo del formulario (`formX`), siempre encima del primer campo:
 
-### 7.4 BiosButton (4 estados)
-Botón de selección estilo BIOS, **no** redondeado.
-- **Inactivo:** texto fósforo + contorno neón. `font-family:'Silkscreen'; font-size:12px; letter-spacing:.16em; color:var(--phosphor-pink); background:transparent; border:1px solid var(--neon-pink); padding:11px 20px; box-shadow:0 0 8px rgba(var(--glow-neon),.25); text-shadow:0 0 6px rgba(var(--glow-pink),.6)`. En hover: sube box-shadow a `.6` y color a `--petal-white`.
-- **Selected (vídeo invertido):** `color:var(--bg-screen); background:var(--neon-pink); box-shadow:0 0 16px rgba(var(--glow-neon),.6)` + caret `►` parpadeante (`animation:caretBlink 1s steps(1) infinite`) antes de la etiqueta.
-- **Small:** `font-size:10px; padding:7px 14px`.
-- **Disabled (OFF):** `color/border:var(--pink-faint)`, sin glow, `cursor:not-allowed`.
+```
+?  = INFO DEL CAMPO         (? Silkscreen Bold 9px --celadon + texto Silkscreen 8px --pink-faint)
+!  = CAMPO OBLIGATORIO      (! Silkscreen Bold 9px --neon   + texto Silkscreen 8px --pink-faint)
+```
 
-### 7.5 Badge / StatusDot
-- **Badge:** caja entre corchetes en VT323. tone `celadon` → texto+borde celadón; tone `neon solid` → `background:var(--neon-pink); color:var(--bg-screen)`; default → fósforo. `padding:3px 9px`.
-- **StatusDot:** cuadro de pixel `11px` (sin radio) + etiqueta Silkscreen 10px en mayúsculas. `online`=celadón y `ingame`=neón **laten** (`animation:dotPulse 1.8s ease-in-out infinite`); `away`=`--pink-faint` sin pulso.
+Gap entre los dos ítems: suficiente para que no se solapen (~140px).
 
-### 7.6 SectionHeader (bilingüe → ahora monolingüe)
-Glifo PixelIcon + etiqueta Silkscreen 15px `letter-spacing:.14em` con bloom. *(El subtítulo katakana fue retirado de este diseño; ver §9.)*
+### 7.4 Separador de sección
 
-### 7.7 CrtFrame / ArcadePanel (cristal)
-Único elemento con esquinas curvas: `border:2px solid var(--neon-pink); border-radius:16px; box-shadow:0 0 22px rgba(var(--glow-neon),.4), inset 0 0 40px rgba(0,0,0,.5); overflow:hidden` + textura scanline local (§5.3). Badge de letra A/B/C en la esquina: `position:absolute; top:10px; right:14px; VT323 14px; color:var(--pink-faint)`.
+```css
+height: 1px;
+background: linear-gradient(90deg, transparent 0%, var(--neon-pink) 50%, transparent 100%);
+width: 420px; /* formW */
+```
 
-### 7.8 Filas de lobby (GameRow / FriendRow / TournamentRow)
-Se apilan **sin huecos** dentro de un panel `background:var(--bg-screen)`, separadas por `border-bottom:1px solid var(--border)`. Patrón: `display:flex; align-items:center; gap:16px; padding:14px 18px`.
-- **GameRow:** `{icono}` · nombre (DotGothic16 17px, `flex:1`) · Badge celadón `«128 ON»` · BiosButton `PLAY`.
-- **FriendRow:** tile de avatar `30px` (`--bg-panel-2`, inicial en VT323) · nombre/código (VT323 17px) · StatusDot.
-- **TournamentRow:** icono corona celadón · nombre · Badge `«64 ENT»` (borde `--pink-faint`) · cuenta atrás `HH:MM:SS` (VT323 22px celadón con bloom) que al llegar a 0 cambia a `LIVE NOW` (`animation:livePulse 1.4s ease-in-out infinite`).
+Usar antes y después de grupos clave (antes del primer campo, antes del botón primario, antes del footer).
+
+### 7.5 Divisor vertical del split
+
+```css
+/* Línea principal */
+width: 1px; height: 800px;
+background: rgba(var(--glow-neon), .25);
+
+/* Glow difuso superpuesto */
+width: 6px; height: 800px; x: leftW - 3px;
+background: rgba(var(--glow-neon), .06);
+```
+
+### 7.6 Badge de tema
+
+Caja `100 × 24px`, esquina inferior-izquierda del panel hero (`x=48, y=H-52`).
+
+```
+background: var(--bg-panel-2)
+border: 1px solid rgba(var(--glow-neon),.4)
+texto: Silkscreen Regular 9px, --neon-pink, centrado
+contenido: [ SAKURA ] | [ AMBER ] | [ BLUE ]
+```
+
+### 7.7 Link subrayado
+
+Silkscreen 9px `--pink-dim`. La porción accionable lleva un `rect` de `1px` en `rgba(var(--glow-neon),.7)` pegado inmediatamente debajo del texto.
 
 ---
 
-## 8. Lógica (`class Component extends DCLogic`)
+## 8. Panel izquierdo — hero/branding (460 × 800 px)
 
-Responsabilidades: aplicar tema, generar iconos pixel, y mantener relojes/cuentas atrás **en vivo**.
+Estructura idéntica en todas las pantallas de auth. Solo cambia el **título hero** y el **texto de contexto**.
+
+```
+background: --bg-left
++ viñeta radial oscura: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,.72) 100%)
++ glow radial neón al 4%: radial-gradient(ellipse at 50% 50%, rgba(var(--glow-neon),.04) 0%, transparent 60%)
+
+y=52    ARCADEVS          Silkscreen Bold 28px, --neon-pink
+y=94    ▬▬▬▬▬▬▬▬▬▬       rect 200×2px, --neon-pink opacidad .5
+y=260   HERO L1           Silkscreen Bold 32–36px, --petal-white
+y=304   HERO L2           Silkscreen Bold 24–32px, --neon-pink
+y=350   ▬▬▬              rect 80×3px, --neon-pink opacidad .7
+y=368   subtexto L1       Silkscreen 9px, --pink-dim
+y=384   subtexto L2       Silkscreen 9px, --pink-faint
+y=H-52  [ TEMA ]          badge
+```
+
+| Pantalla | Hero L1 | Hero L2 | Subtexto L1 | Subtexto L2 |
+|---|---|---|---|---|
+| Registro | `EMPIEZA` | `AQUI` | `SISTEMA DE REGISTRO · ARCADEVS` | `VER 1.0 · [TEMA]` |
+| Verificación | `VERIFICA` | `TU CUENTA` | `REVISA TU BANDEJA DE ENTRADA.` | `EL CODIGO EXPIRA EN 15 MINUTOS.` |
+
+> El panel izquierdo **no lleva iconos de email, puntos decorativos ni ningún otro elemento gráfico adicional** más allá de los indicados arriba.
+
+---
+
+## 9. Panel derecho — pantallas de autenticación
+
+El formulario se centra en `formW = 420px`:
+
+```
+formX = 460 + (820 - 420) / 2 = 660px (desde borde izq. del frame)
+```
+
+---
+
+### 9.1 Pantalla REGISTRO (`CREAR CUENTA`)
+
+```
+y=80    CREAR CUENTA                    Silkscreen Bold 20px, --petal-white, centrado en formW
+y=116   INGRESA TUS DATOS PARA...       Silkscreen 9px, --pink-dim, centrado
+y=130   ─────────────── (separador) ───────────────
+y=140   ? = INFO DEL CAMPO   ! = CAMPO OBLIGATORIO   (leyenda, alineada a formX)
+
+y=160   NOMBRE !    [__________][?]   APELLIDO !   [__________][?]
+            halfW=187px                   col2X = formX + 187 + 32 + 4
+
+y=224   CORREO ELECTRONICO !
+        [__________________________________][?]   fieldW=388px
+
+y=288   CONTRASENA !
+        [__________________________________][?]
+
+y=352   CONFIRMAR CONTRASENA !
+        [__________________________________][?]
+
+y=418   MINIMO 8 CARACTERES.            Silkscreen 8px, --pink-faint
+y=430   ─────────────── (separador) ───────────────
+y=444   ► REGISTRARSE                  BiosButton selected, ancho formW=420px, alto 40px
+y=498   ─────────────── (separador) ───────────────
+y=510   YA TIENES UNA CUENTA?  INICIA SESION
+                                        Silkscreen 9px, --pink-dim, centrado
+                                        "INICIA SESION" con rect subrayado 1px --neon-pink
+y=H-28  ARCADEVS · REGISTRO · VER 1.0 · [TEMA]   Silkscreen 8px, --pink-faint, centrado
+```
+
+---
+
+### 9.2 Pantalla VERIFICACIÓN (`CODIGO DE VERIFICACION`)
+
+```
+y=80    CODIGO DE VERIFICACION         Silkscreen Bold 18px, --petal-white, centrado
+y=110   INGRESA EL CODIGO DE 6 DIGITOS ENVIADO A TU CORREO.
+                                        Silkscreen 9px, --pink-dim, centrado
+y=130   ju***@correo.com               Silkscreen 10px, --celadon, centrado
+y=152   ─────────────── (separador) ───────────────
+y=162   EXPIRA EN                      Silkscreen 9px, --pink-dim, centrado
+
+y=180   ┌──────────────────┐
+        │     14:59        │  Silkscreen Bold 28px, --neon-pink
+        └──────────────────┘  caja 160×52px, --bg-panel-2, border 1px --neon-pink (.5)
+                               animation: timerPulse 1.8s ease-in-out infinite
+        Posición: centrado en formW  (x = formX + (formW-160)/2)
+
+y=240   MM : SS                        Silkscreen 8px, --pink-faint, centrado
+y=252   ─────────────── (separador) ───────────────
+y=262   INGRESA TU CODIGO:             Silkscreen 9px, --pink-dim, centrado
+
+y=276   [  |  ]  [___]  [___]  —  [___]  [___]  [___]
+        ↑ 6 cajas 52×64px, gap 12px entre cajas
+        ↑ separador — (VT323 Bold 24px, --pink-faint) entre dígito 3 y 4
+        ↑ totalW = 6×52 + 5×12 = 372px  →  startX = formX + (formW-372)/2
+        Caja 1 (activa):  border 2px --neon-pink, fondo --bg-panel
+                          cursor rect 2×32px --neon-pink, centrado, animation:caretBlink
+        Cajas 2–6:        border 1px rgba(--pink-faint,.4), fondo --bg-panel-2
+                          placeholder _ Silkscreen Bold 18px --pink-faint, centrado
+
+y=358   ─────────────── (separador) ───────────────
+y=372   ► VERIFICAR CODIGO             BiosButton selected, ancho formW, alto 40px
+y=426   REENVIAR CODIGO                BiosButton inactivo, ancho formW, alto 40px
+y=478   DISPONIBLE SI EL TIEMPO EXPIRA.  Silkscreen 8px, --pink-faint, centrado
+y=492   ─────────────── (separador) ───────────────
+y=504   REGRESAR AL REGISTRO           Silkscreen 9px, --pink-dim, centrado, subrayado completo
+y=H-28  ARCADEVS · VERIFICACION · VER 1.0 · [TEMA]  Silkscreen 8px, --pink-faint, centrado
+```
+
+---
+
+## 10. Flujo de navegación entre pantallas
+
+```
+┌────────────┐   CREAR CUENTA   ┌────────────┐
+│   LOGIN    │ ───────────────► │  REGISTRO  │
+│ (pendiente)│                  └─────┬──────┘
+└────────────┘                        │ ► REGISTRARSE
+      ▲                               ▼
+      │                        ┌──────────────┐
+      │   VERIFICAR CODIGO     │ VERIFICACION │
+      └────────────────────────└──────────────┘
+                                      │ REGRESAR AL REGISTRO
+                                      └──────────────────────► REGISTRO
+```
+
+- **Registro → Verificación:** al pulsar `► REGISTRARSE` exitosamente.
+- **Verificación → Login:** al pulsar `► VERIFICAR CODIGO` con código correcto.
+- **Verificación → Registro:** link `REGRESAR AL REGISTRO`.
+- **Login** (*pendiente de diseño*): acceso desde link `INICIA SESION` en Registro.
+
+---
+
+## 11. Lógica de estado — componentes dinámicos
 
 ```js
 class Component extends DCLogic {
-  glyphs = { /* …matrices 7×7 de §6… */ };
-  state = { t1: 5400, t2: 600, clock: '' };       // t1=01:30:00, t2=00:10:00
+  state = {
+    timer_verificacion: 900,  // 15:00 en segundos → 14:59 al iniciar el tick
+    clock: '',
+  };
 
-  componentDidMount() { this.applyTheme(); this.tick(); this._iv = setInterval(() => this.tick(), 1000); }
-  componentDidUpdate() { this.applyTheme(); }      // reaplica tema en cada render
+  componentDidMount()    { this.tick(); this._iv = setInterval(() => this.tick(), 1000); }
   componentWillUnmount() { clearInterval(this._iv); }
 
   tick() {
-    const d = new Date();
-    const cl = [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2,'0')).join(':');
-    this.setState(s => ({ t1: Math.max(0, s.t1-1), t2: Math.max(0, s.t2-1), clock: cl }));
+    const d  = new Date();
+    const cl = [d.getHours(), d.getMinutes(), d.getSeconds()]
+                 .map(n => String(n).padStart(2,'0')).join(':');
+    this.setState(s => ({
+      timer_verificacion: Math.max(0, s.timer_verificacion - 1),
+      clock: cl,
+    }));
   }
-  applyTheme() {
-    const t = this.props.theme || 'sakura';
-    const r = document.documentElement;
-    if (t === 'sakura') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t);
-  }
-  fmt(sec){ const h=String(Math.floor(sec/3600)).padStart(2,'0'),
-            m=String(Math.floor(sec%3600/60)).padStart(2,'0'),
-            s=String(sec%60).padStart(2,'0'); return h+':'+m+':'+s; }
-  glyph(name,size,color,glow){ /* …de §6… */ }
 
-  renderVals() {
-    const NEON='var(--neon-pink)', PINK='var(--phosphor-pink)', CEL='var(--celadon)';
-    const GN='var(--glow-neon)', GP='var(--glow-pink)', GC='var(--glow-cel)';
-    const g = (n,s,c,gl) => this.glyph(n,s,c,gl);
-    return {
-      scanOn: (this.props.scanlines ?? true) ? 'block' : 'none',
-      vignetteOn: (this.props.curvature ?? true) ? 'block' : 'none',
-      t1: this.fmt(this.state.t1), t2: this.fmt(this.state.t2),
-      clock: this.state.clock || '00:00:00',
-      // iconos (nombre,tamaño,color,glow) — uno por uso en la plantilla:
-      shPawn:g('pawn',32,NEON,GN), shGrid:g('grid',32,NEON,GN), /* …showcase 32px neón… */
-      hdrPawn:g('pawn',26,PINK,GP), hdrCrown:g('crown',26,CEL,GC),
-      grPawn:g('pawn',28,PINK,GP), /* …etc para cada fila… */
-    };
+  fmt_mm_ss(seg) {
+    const m = String(Math.floor(seg / 60)).padStart(2, '0');
+    const s = String(seg % 60).padStart(2, '0');
+    return `${m}:${s}`;
   }
+
+  // true cuando el usuario puede reenviar el código
+  get codigo_expirado() { return this.state.timer_verificacion === 0; }
 }
 ```
 
-Los iconos se exponen como nodos React por `renderVals()` y se insertan en la plantilla con holes `{{ shPawn }}`, `{{ hdrCrown }}`, etc. Los temporizadores `{{ t1 }}` `{{ t2 }}` `{{ clock }}` también son holes (valores en vivo).
+**Holes de plantilla:**
+- `{{ timer }}` → `fmt_mm_ss(timer_verificacion)` — muestra `14:59`, decrece cada segundo.
+- `{{ reenviar_disabled }}` → `!codigo_expirado` — el BiosButton `REENVIAR CODIGO` lleva `disabled` mientras el timer no llegue a `0`.
 
 ### Props / Tweaks (`data-props`)
+
 ```json
 {
-  "$preview": { "width": 920, "height": 1500 },
+  "$preview": { "width": 1280, "height": 800 },
   "theme":     { "editor": "enum", "options": ["sakura","amber","blue"], "default": "sakura", "section": "CRT" },
-  "scanlines": { "editor": "boolean", "default": true, "section": "CRT" },
-  "curvature": { "editor": "boolean", "default": true, "section": "CRT" }
+  "scanlines": { "editor": "boolean", "default": true,  "section": "CRT" },
+  "curvature": { "editor": "boolean", "default": true,  "section": "CRT" }
 }
 ```
 
 ---
 
-## 9. Contenido y voz
+## 12. Contenido y voz
 
-- **Tono:** escueto, tipo sistema, algo juguetón — pantalla de atracción de arcade, no dashboard SaaS.
-- **Mayúsculas** con tracking amplio en etiquetas/botones; numéricos desnudos en monospace.
-- **Sin emoji:** el estado usa cuadros de pixel + palabras (`ONLINE · IN GAME · AWAY`).
-- **Idioma:** *en esta versión se retiró todo el katakana/japonés decorativo*. Los subtítulos kana de los encabezados y el «ruido» atmosférico se eliminan; los nombres que portan información se escriben en inglés/latino (Chess, Dots, Word Search, Backgammon, Sakura Cup, Night Blitz, Go Master). Conserva las menciones en prosa española («soporta katakana y kanji») por ser explicativas.
-
-### Estructura del documento (orden de secciones)
-1. **Hero** — etiqueta `ARCADEVS · SYSTEM DOC`, logotipo `ARCADEVS` (Silkscreen 62px con bloom triple), `GUÍA TÉCNICA DEL DISEÑO`, subtítulo y línea `VER · 1.0 · SAKURA / AMBER / BLUE · NS · TablPolisDesignSystem_0d5fe2`.
-2. **ÍNDICE** — rejilla de 2 columnas, ítems `01…11` (número neón + título fósforo).
-3. **01 Concepto y principios** — 2 párrafos + 4 fichas (Fósforo · Esquinas rectas · Bilingüe · Sin emoji).
-4. **02 Color** — párrafo + 8 swatches (con hex literal sakura) + bloque «Jerarquía por brillo» + comentario de temas.
-5. **03 Tipografía** — 3 especímenes (DotGothic16 / VT323 / Silkscreen) + escala.
-6. **04 Espaciado y rejilla** — barras 4→64 + bloque de tokens.
-7. **05 Efectos CRT** — 4 fichas (Bloom · Edge · Scan · Grid, cada una mostrando su efecto) + nota de animación.
-8. **06 Iconografía** — panel con los 8 sprites + nota del mapa GLYPHS.
-9. **07 Componentes base** — fichas BiosButton, Badge·StatusDot, SectionHeader, CrtFrame·ArcadePanel (demo en vivo + tabla de props + código).
-10. **08 Componentes de lobby** — fichas GameRow, FriendRow, TournamentRow.
-11. **09 Cómo construir una pantalla** — 5 pasos + recreación del lobby completo (header con reloj en vivo, 2 columnas, barra de estado) + código.
-12. **10 Voz y contenido** — 4 fichas + bloque de ejemplos.
-13. **11 Notas técnicas** — cargar el sistema, temas CRT, nota de sustitución de fuentes, advertencia «no editar archivos generados».
-14. **Footer** — regla + `ARCADEVS` + `GUÍA TÉCNICA · FIN DEL DOCUMENTO`.
+- **Idioma:** español en toda la UI. Sin ningún texto en otros idiomas.
+- **Mayúsculas** en todos los elementos de UI, con `letter-spacing: 0.10–0.16em`.
+- **Sin emoji** en ninguna pantalla.
+- **Tono:** escueto, tipo sistema. Mensajes directos: `INGRESA TUS DATOS`, `EL CODIGO EXPIRA EN 15 MINUTOS`, `CAMPO OBLIGATORIO`. Sin lenguaje de marketing.
+- **Emails maskeados:** siempre formato `ju***@dominio.com` en `--celadon`.
+- **Errores de validación** (*pendiente de diseño*): texto en `--neon-pink`, borde del input al 100% opacidad, prefijo `▸ ERROR:` en Silkscreen Bold.
 
 ---
 
-## 10. Checklist de fidelidad
+## 13. Checklist de fidelidad
 
-- [ ] Fondo `--bg-screen`; todo el texto/borde con bloom; nada plano.
-- [ ] Solo DotGothic16 / VT323 / Silkscreen; ninguna sans.
-- [ ] Esquinas rectas en todo salvo el cristal CrtFrame (radius 16) y chips (2px).
-- [ ] Separadores = línea de neón de 1px con glow, no espacios en blanco.
-- [ ] Scanlines + viñeta + barrido de carga activos; columna con `flick`.
-- [ ] Iconos = sprites SVG 7×7 con `crispEdges` y drop‑shadow; sin emoji.
-- [ ] Reloj, caret, status dots, `LIVE NOW` y cuentas atrás animados/en vivo.
-- [ ] Tweaks funcionales: tema (Sakura/Amber/Blue), scanlines, curvatura — todo recolorea vía `--glow-*`.
-- [ ] Cero caracteres katakana/kanji en la interfaz renderizada (§9).
+- [ ] Frame `1280 × 800px`; panel izquierdo `460px`; formulario centrado en `420px`.
+- [ ] `--bg-left` en panel izquierdo; `--bg-screen` en panel derecho; ambos con viñeta radial.
+- [ ] Divisor vertical `1px` + glow difuso `6px`.
+- [ ] Solo Silkscreen / DotGothic16 / VT323; cero fuentes sans.
+- [ ] `border-radius:0` en **todos** los elementos sin excepción.
+- [ ] Separadores horizontales = `1px` con gradiente centrado (desvanece en extremos).
+- [ ] Todo texto de UI en **español** y **mayúsculas**.
+- [ ] Marcadores `!` (neón) y botón `?` (celadón) en cada campo de formulario.
+- [ ] Leyenda `? = INFO DEL CAMPO` y `! = CAMPO OBLIGATORIO` visible encima del primer campo, alineada a `formX`.
+- [ ] Panel izquierdo: solo logo, línea, hero L1/L2, línea decorativa, subtexto y badge — sin íconos adicionales.
+- [ ] Display timer `MM:SS` con `animation:timerPulse` en pantalla de Verificación.
+- [ ] 6 cajas de dígito `52×64px`; separador `—` entre dígito 3 y 4; caja 1 con cursor parpadeante (`caretBlink`).
+- [ ] `REENVIAR CODIGO` deshabilitado mientras `timer_verificacion > 0`.
+- [ ] Badge `[ SAKURA / AMBER / BLUE ]` en esquina inferior-izquierda del panel hero.
+- [ ] Footer centrado: `ARCADEVS · [PANTALLA] · VER 1.0 · [TEMA]` en `--pink-faint`.
+- [ ] Scanlines + viñeta + barrido de carga activos al entrar en cada pantalla.
+- [ ] Los tres temas recoloran automáticamente vía `--glow-*`.
