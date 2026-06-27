@@ -1,7 +1,7 @@
 # Documento de Arquitectura Técnica
 ## CRT Retro Gaming — Sitio Web de Videojuegos Tradicionales
 
-**Versión:** 1.0.0  
+**Versión:** 2.0.0  
 **Fecha:** Junio 2026  
 **Autor:** Equipo de Desarrollo
 
@@ -44,7 +44,7 @@ CRT Retro Gaming es una plataforma web de videojuegos arcade clásicos jugables 
 | Tiempo real | Socket.io | Abstracción robusta sobre WebSockets, soporte a eventos con namespaces |
 | Backend | Node.js + Fastify | Alto rendimiento, validación nativa de schemas JSON |
 | Base de datos | PostgreSQL (Supabase) | Relacional, confiable, tier gratuito generoso |
-| Auth | Supabase Auth (JWT) | Auth completo sin implementación manual |
+| Auth | Supabase Auth (JWT) | Auth completo sin implementación manual; gestiona sesiones, tokens y expiración de forma nativa |
 | Deploy Frontend | Vercel | CDN global, despliegue automático desde GitHub |
 | Deploy Backend | Railway | Soporte nativo Node.js, 500h/mes gratis |
 | Almacenamiento | Supabase Storage | Assets de juegos e imágenes de perfil |
@@ -196,13 +196,13 @@ Las tablas y columnas de PostgreSQL usan **snake_case** en español, en plural p
 ```sql
 -- ✅ Correcto
 CREATE TABLE usuarios (
-  id_usuario    UUID PRIMARY KEY,
+  id_usuario    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nombre        VARCHAR(50),
   fecha_registro TIMESTAMP
 );
 
 CREATE TABLE puntajes (
-  id_puntaje  UUID PRIMARY KEY,
+  id_puntaje  UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   id_usuario  UUID REFERENCES usuarios(id_usuario),
   id_juego    UUID REFERENCES juegos(id_juego),
   puntaje     INTEGER,
@@ -219,11 +219,7 @@ Las variables de entorno usan **SCREAMING_SNAKE_CASE** con prefijo por contexto.
 DB_URL=
 DB_PUERTO=5432
 
-# Autenticación
-AUTH_JWT_SECRETO=
-AUTH_EXPIRACION_TOKEN=7d
-
-# Supabase
+# Autenticación (Supabase Auth — no se gestionan tokens propios)
 SUPABASE_URL=
 SUPABASE_CLAVE_PUBLICA=
 SUPABASE_CLAVE_PRIVADA=
@@ -320,12 +316,20 @@ io.on("connection", (socket) => {
 
 ## 6. Esquema de Base de Datos
 
+> **Decisión de diseño — PKs como UUID:** todas las tablas usan `UUID` generado por `gen_random_uuid()` en lugar de enteros autoincrementales. Esto previene la enumeración de recursos por usuarios malintencionados (un ID secuencial expone `/partidas/42`, `/partidas/43`, etc.) y es consistente con Supabase Auth, que también identifica usuarios con UUID.
+
+> **Decisión de diseño — Sesiones delegadas a Supabase Auth:** no existe tabla `sesiones` propia. Supabase Auth gestiona tokens JWT, refresco, expiración y estado de sesión de forma nativa. Mantener una tabla propia duplicaría la fuente de verdad y generaría inconsistencias.
+
 ```sql
 -- Usuarios del sistema
 CREATE TABLE usuarios (
   id_usuario      UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nombre          VARCHAR(50) UNIQUE NOT NULL,
   correo          VARCHAR(255) UNIQUE NOT NULL,
+  contrasena_hash TEXT NOT NULL,
+  codigo_amigo    CHAR(12) UNIQUE NOT NULL,
+  nacionalidad    VARCHAR(100),
+  fecha_nacimiento DATE,
   avatar_url      TEXT,
   fecha_registro  TIMESTAMP DEFAULT NOW(),
   ultima_conexion TIMESTAMP
@@ -333,43 +337,146 @@ CREATE TABLE usuarios (
 
 -- Catálogo de juegos
 CREATE TABLE juegos (
-  id_juego     UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  nombre       VARCHAR(100) NOT NULL,
-  descripcion  TEXT,
-  slug         VARCHAR(100) UNIQUE NOT NULL,
-  thumbnail_url TEXT,
-  activo       BOOLEAN DEFAULT TRUE,
+  id_juego       UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  nombre         VARCHAR(100) UNIQUE NOT NULL,
+  slug           VARCHAR(100) UNIQUE NOT NULL, -- kebab-case, usado en URLs /juegos/:slug
+  descripcion    TEXT,
+  thumbnail_url  TEXT,
+  activo         BOOLEAN DEFAULT TRUE,
   fecha_creacion TIMESTAMP DEFAULT NOW()
 );
 
+-- Tags normalizados (valores controlados, sin texto libre)
+CREATE TABLE tags (
+  id_tag UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  nombre VARCHAR(50) UNIQUE NOT NULL -- siempre en minúsculas, ej: "estrategia", "puzzle"
+);
+
+-- Relación juego ↔ tag (muchos a muchos)
+CREATE TABLE juegos_tags (
+  id_juego UUID REFERENCES juegos(id_juego) ON DELETE CASCADE,
+  id_tag   UUID REFERENCES tags(id_tag) ON DELETE CASCADE,
+  PRIMARY KEY (id_juego, id_tag)
+);
+
+-- Modalidades de juego
+CREATE TABLE modalidades (
+  id_modalidad UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  nombre       VARCHAR(100) NOT NULL,
+  descripcion  TEXT,
+  permite_bot  BOOLEAN DEFAULT FALSE,
+  puntua       BOOLEAN DEFAULT TRUE -- false = no suma al ranking (ej: partida vs bot)
+);
+
 -- Relaciones de amistad
-CREATE TABLE amistades (
-  id_amistad   UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  id_usuario_a UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
-  id_usuario_b UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
-  estado       VARCHAR(20) CHECK (estado IN ('pendiente', 'aceptada', 'rechazada')),
-  fecha        TIMESTAMP DEFAULT NOW(),
-  UNIQUE(id_usuario_a, id_usuario_b)
+-- CHECK garantiza orden canónico: (A, B) y (B, A) no pueden coexistir
+CREATE TABLE solicitudes_amistad (
+  id_solicitud   UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_solicitante UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+  id_receptor    UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+  estado         VARCHAR(20) CHECK (estado IN ('pendiente', 'aceptado', 'rechazado', 'bloqueado')),
+  fecha_solicitud TIMESTAMP DEFAULT NOW(),
+  fecha_respuesta TIMESTAMP,
+  CHECK (id_solicitante < id_receptor),        -- previene duplicados invertidos
+  UNIQUE (id_solicitante, id_receptor)
 );
 
--- Puntajes para leaderboards
-CREATE TABLE puntajes (
-  id_puntaje  UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  id_usuario  UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
-  id_juego    UUID REFERENCES juegos(id_juego) ON DELETE CASCADE,
-  puntaje     INTEGER NOT NULL,
-  fecha       TIMESTAMP DEFAULT NOW()
+-- Torneos
+CREATE TABLE torneos (
+  id_torneo          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_juego           UUID REFERENCES juegos(id_juego) ON DELETE RESTRICT,
+  id_modalidad       UUID REFERENCES modalidades(id_modalidad) ON DELETE RESTRICT,
+  nombre             VARCHAR(255) NOT NULL,
+  estado             VARCHAR(20) CHECK (estado IN ('inscripcion', 'en_curso', 'finalizado')),
+  fecha_inicio       TIMESTAMP,
+  fecha_fin          TIMESTAMP,
+  max_participantes  INTEGER
 );
 
--- Historial de sesiones de juego
-CREATE TABLE sesiones_juego (
-  id_sesion         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  id_usuario        UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
-  id_juego          UUID REFERENCES juegos(id_juego) ON DELETE CASCADE,
-  duracion_segundos INTEGER,
-  puntaje_obtenido  INTEGER,
-  fecha             TIMESTAMP DEFAULT NOW()
+-- Participantes de torneo
+CREATE TABLE torneos_participantes (
+  id_participacion UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_torneo        UUID REFERENCES torneos(id_torneo) ON DELETE CASCADE,
+  id_usuario       UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+  fecha_inscripcion TIMESTAMP DEFAULT NOW(),
+  UNIQUE (id_torneo, id_usuario)
 );
+
+-- Partidas (casuales y de torneo)
+-- Cuando id_torneo IS NOT NULL, id_juego e id_modalidad deben coincidir con el torneo.
+-- Esta restricción se valida en la capa de aplicación antes de cada INSERT.
+CREATE TABLE partidas (
+  id_partida   UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_juego     UUID REFERENCES juegos(id_juego) ON DELETE RESTRICT,
+  id_modalidad UUID REFERENCES modalidades(id_modalidad) ON DELETE RESTRICT,
+  id_torneo    UUID REFERENCES torneos(id_torneo) ON DELETE SET NULL, -- null = partida casual
+  fecha_inicio TIMESTAMP DEFAULT NOW(),
+  fecha_fin    TIMESTAMP,
+  estado       VARCHAR(20) CHECK (estado IN ('en_curso', 'finalizada', 'abandonada'))
+);
+
+-- Jugadores por partida (incluye bots: id_usuario = null, es_bot = true)
+CREATE TABLE partidas_jugadores (
+  id_partida_jugador UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_partida         UUID REFERENCES partidas(id_partida) ON DELETE CASCADE,
+  id_usuario         UUID REFERENCES usuarios(id_usuario) ON DELETE SET NULL, -- null si es bot
+  es_bot             BOOLEAN DEFAULT FALSE,
+  puntuacion         INTEGER DEFAULT 0,
+  resultado          VARCHAR(10) CHECK (resultado IN ('victoria', 'derrota', 'empate'))
+);
+
+-- Rankings por juego (contadores desnormalizados para rendimiento)
+-- IMPORTANTE: victorias y partidas_jugadas deben actualizarse en la misma transacción
+-- que el INSERT en partidas_jugadores para garantizar consistencia.
+CREATE TABLE rankings_juego (
+  id_ranking         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_usuario         UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+  id_juego           UUID REFERENCES juegos(id_juego) ON DELETE CASCADE,
+  puntuacion_total   INTEGER DEFAULT 0,
+  partidas_jugadas   INTEGER DEFAULT 0,
+  victorias          INTEGER DEFAULT 0,
+  ultima_actualizacion TIMESTAMP DEFAULT NOW(),
+  UNIQUE (id_usuario, id_juego),
+  CHECK (victorias <= partidas_jugadas)  -- protección ante desincronización de contadores
+);
+
+-- Chats (privados entre usuarios o de sala de partida)
+CREATE TABLE chats (
+  id_chat    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  tipo       VARCHAR(10) CHECK (tipo IN ('privado', 'partida')),
+  id_partida UUID REFERENCES partidas(id_partida) ON DELETE CASCADE, -- null si tipo = 'privado'
+  fecha_creacion TIMESTAMP DEFAULT NOW()
+);
+
+-- Participantes de chat
+-- Para tipo 'privado': la aplicación garantiza exactamente 2 participantes al crear el chat.
+CREATE TABLE chats_participantes (
+  id_participacion UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_chat          UUID REFERENCES chats(id_chat) ON DELETE CASCADE,
+  id_usuario       UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+  fecha_union      TIMESTAMP DEFAULT NOW(),
+  UNIQUE (id_chat, id_usuario)
+);
+
+-- Mensajes
+CREATE TABLE mensajes (
+  id_mensaje UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_chat    UUID REFERENCES chats(id_chat) ON DELETE CASCADE,
+  id_usuario UUID REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+  texto      TEXT NOT NULL,
+  hora_envio TIMESTAMP DEFAULT NOW()
+);
+
+-- Estado de lectura por receptor (tabla de alto volumen)
+CREATE TABLE mensajes_estado (
+  id_estado   UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_mensaje  UUID REFERENCES mensajes(id_mensaje) ON DELETE CASCADE,
+  id_usuario  UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE, -- el receptor
+  estado      VARCHAR(10) CHECK (estado IN ('enviado', 'entregado', 'leido')),
+  fecha_cambio TIMESTAMP DEFAULT NOW()
+);
+-- Índice obligatorio: tabla de alto volumen en sesiones de torneo
+CREATE INDEX idx_mensajes_estado_lookup ON mensajes_estado (id_mensaje, id_usuario);
 ```
 
 ---
@@ -428,13 +535,17 @@ Cliente                    Servidor                  Base de Datos
    │                          │                           │
    │── juego:partida_terminada ──►│                           │
    │   { id_juego, puntaje }   │                           │
-   │                          │── guardar_sesion() ────────►│
-   │                          │── actualizar_puntaje() ─────►│
+   │                          │── BEGIN TRANSACTION ───────►│
+   │                          │── guardar_sesion() ─────────►│ (partidas_jugadores)
+   │                          │── actualizar_ranking() ──────►│ (rankings_juego — atómico con lo anterior)
+   │                          │── COMMIT ───────────────────►│
    │                          │── verificar_logros() ───────►│
    │                          │◄── top 10 puntajes ──────────│
    │◄── juego:puntaje_actualizado │                           │
    │   { tabla_puntajes[] }    │                           │
 ```
+
+> La actualización de `partidas_jugadores` y `rankings_juego` ocurre en una sola transacción para garantizar que los contadores `partidas_jugadas` y `victorias` nunca se desincronicen.
 
 ### 8.2 Flujo: Solicitud de Amistad
 
@@ -442,6 +553,7 @@ Cliente                    Servidor                  Base de Datos
 Usuario A (Cliente)         Servidor              Usuario B (Cliente)
    │                           │                        │
    │── amigo:solicitud_enviada ──►│                        │
+   │                           │── validar orden UUID ───►│ (garantiza id_a < id_b)
    │                           │── guardar_solicitud() ──►DB
    │                           │── emit a socket de B ──►│
    │                           │                        │── amigo:solicitud_recibida
@@ -449,6 +561,8 @@ Usuario A (Cliente)         Servidor              Usuario B (Cliente)
    │                           │── actualizar_estado() ──►DB
    │◄── amigo:vinculo_confirmado│── amigo:vinculo_confirmado ──►│
 ```
+
+> Antes de insertar en `solicitudes_amistad`, el servidor normaliza el orden de los UUIDs (`id_solicitante < id_receptor`) para respetar la restricción `CHECK` de la tabla.
 
 ---
 
@@ -459,6 +573,7 @@ Usuario A (Cliente)         Servidor              Usuario B (Cliente)
 | Frontend | Vercel | `https://crt-gaming.vercel.app` |
 | Backend | Railway | `https://api-crt-gaming.railway.app` |
 | Base de datos | Supabase | Gestionado internamente |
+| Auth | Supabase Auth | Gestionado internamente |
 
 ### Variables de entorno por entorno
 
@@ -489,6 +604,7 @@ Formato: `tipo(alcance): descripcion en español`
 feat(leaderboard): agregar actualización en tiempo real vía socket
 fix(autenticacion): corregir expiración de token JWT
 docs(arquitectura): actualizar catálogo de eventos de amigos
+refactor(bd): migrar PKs de entero a UUID en todas las tablas
 ```
 
 ### Reglas Generales
@@ -498,7 +614,9 @@ docs(arquitectura): actualizar catálogo de eventos de amigos
 3. Los eventos Socket.io se documentan en este archivo antes de implementarse.
 4. Las variables de entorno nunca se suben al repositorio. Siempre van en `.env.local`.
 5. Cada juego vive en su propia carpeta bajo `/juegos/` y no importa código de otros juegos.
+6. Toda operación que modifique `partidas_jugadores` y `rankings_juego` simultáneamente debe ejecutarse dentro de una transacción de base de datos.
+7. El orden canónico `(id_solicitante < id_receptor)` debe normalizarse en el servidor antes de cualquier INSERT en `solicitudes_amistad`.
 
 ---
 
-*Documento generado: Junio 2026 — CRT Retro Gaming v1.0.0*
+*Documento generado: Junio 2026 — CRT Retro Gaming v2.0.0*
