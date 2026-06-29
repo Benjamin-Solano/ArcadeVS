@@ -1,0 +1,330 @@
+===============================================================================
+ARCADEVS — INSTRUCCIONES PARA CONSTRUIR EL FRONTEND
+Versión: 1.0.0 | Basado en arquitectura-crt-gaming-v2.md y diseño-crt-gaming.md
+===============================================================================
+
+Este documento describe cómo construir el frontend de ArcadeVS: una plataforma
+web de juegos arcade clásicos con estética de monitor CRT (fósforo sakura).
+Todo el código y TODA la UI van en ESPAÑOL y MAYÚSCULAS.
+
+Principio rector del diseño: "todo es emisión de fósforo, no tinta". Cada texto
+y cada borde emite un halo (bloom). La jerarquía se controla por BRILLO, no por
+peso. Esquinas rectas (radio 0) en TODOS los elementos sin excepción.
+
+
+-------------------------------------------------------------------------------
+1. STACK Y REQUISITOS
+-------------------------------------------------------------------------------
+
+- Node.js 20+ (LTS)
+- React + Vite    → framework de UI con HMR rápido
+- Canvas API + Vanilla JS → motor de cada juego (control total del render)
+- socket.io-client → comunicación en tiempo real con el backend
+- @supabase/supabase-js → cliente de Supabase Auth en el navegador
+
+Dependencias de desarrollo:
+- vitest + @testing-library/react → pruebas de componentes
+- eslint + prettier → linting y formato
+
+
+-------------------------------------------------------------------------------
+2. INICIALIZACIÓN DEL PROYECTO
+-------------------------------------------------------------------------------
+
+Dentro de la carpeta Frontend_ArcadeVS:
+
+  npm create vite@latest . -- --template react
+  npm install
+  npm install socket.io-client @supabase/supabase-js
+  npm install -D vitest @testing-library/react eslint prettier
+
+Scripts en package.json (Vite ya los provee, agregar test):
+
+  "scripts": {
+    "dev":     "vite",
+    "build":   "vite build",
+    "preview": "vite preview",
+    "test":    "vitest run",
+    "lint":    "eslint src/"
+  }
+
+
+-------------------------------------------------------------------------------
+3. ESTRUCTURA DE CARPETAS
+-------------------------------------------------------------------------------
+
+  Frontend_ArcadeVS/
+  ├── public/
+  ├── src/
+  │   ├── main.jsx                  # Punto de entrada de React
+  │   ├── App.jsx                   # Enrutado principal
+  │   ├── componentes/              # Componentes React reutilizables
+  │   │   ├── perfil-usuario/
+  │   │   ├── tabla-clasificacion/
+  │   │   ├── pantalla-juego/
+  │   │   └── crt/                  # Componentes base del sistema de diseño
+  │   │       ├── bios-button.jsx
+  │   │       ├── input-field.jsx
+  │   │       ├── glifo-pixel.jsx   # Sprites 7×7 en SVG
+  │   │       └── overlays-crt.jsx  # Scanlines, viñeta, barrido
+  │   ├── juegos/                   # Cada juego como módulo INDEPENDIENTE
+  │   │   ├── ajedrez/
+  │   │   │   ├── logica-ajedrez.js
+  │   │   │   └── renderizador-ajedrez.js
+  │   │   └── dots-and-boxes/
+  │   ├── servicios/                # Comunicación con API y Socket.io
+  │   │   ├── servicio-socket.js
+  │   │   ├── servicio-api.js
+  │   │   └── servicio-supabase.js
+  │   ├── contextos/                # React Context para estado global
+  │   │   ├── contexto-usuario.jsx
+  │   │   └── contexto-tema.jsx     # Tema CRT activo (sakura/amber/blue)
+  │   ├── paginas/                  # Vistas principales
+  │   │   ├── pagina-registro.jsx
+  │   │   ├── pagina-verificacion.jsx
+  │   │   ├── pagina-login.jsx
+  │   │   └── pagina-juego.jsx
+  │   └── estilos/
+  │       └── tokens-crt.css        # :root, [data-theme], @keyframes, reset
+  ├── index.html
+  ├── .env.local                    # Variables de entorno (NUNCA se sube al repo)
+  └── package.json
+
+REGLA: cada juego vive en su propia carpeta bajo /juegos/ y NO importa código de
+otros juegos. Cada juego separa lógica (logica-*.js) de render (renderizador-*.js).
+
+
+-------------------------------------------------------------------------------
+4. CONVENCIONES DE CÓDIGO (OBLIGATORIAS)
+-------------------------------------------------------------------------------
+
+Idioma:         Todo identificador, comentario y UI en español.
+
+Variables:      snake_case            → const nombre_usuario = "jugador_01";
+Constantes:     SCREAMING_SNAKE_CASE  → const URL_BASE_API = "...";
+Funciones:      snake_case con prefijo de verbo (obtener_, validar_, emitir_...)
+Componentes:    PascalCase en español → function PantallaJuego() {}
+                                         function TablaClasificacion() {}
+Archivos:       kebab-case            → pantalla-juego.jsx, perfil-usuario.jsx
+
+Reglas estructurales:
+  1. Ningún archivo supera las 200 líneas. Si ocurre, se divide en módulos.
+  2. Toda función pública lleva comentario JSDoc en español.
+  3. Cada juego es un módulo aislado sin imports cruzados.
+
+
+-------------------------------------------------------------------------------
+5. VARIABLES DE ENTORNO (.env.local)
+-------------------------------------------------------------------------------
+
+Vite expone solo variables con prefijo VITE_:
+
+  VITE_URL_BASE_API=http://localhost:3000
+  VITE_URL_SOCKET=http://localhost:3000
+  VITE_SUPABASE_URL=
+  VITE_SUPABASE_CLAVE_PUBLICA=
+
+NUNCA incluir la clave privada de Supabase en el frontend.
+.env.local jamás se sube al repositorio.
+
+
+-------------------------------------------------------------------------------
+6. SISTEMA DE DISEÑO CRT (tokens-crt.css)
+-------------------------------------------------------------------------------
+
+Cargar fuentes en index.html (NINGUNA fuente sans en ninguna parte):
+
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+
+Familias y rol:
+  DotGothic16  → primaria, UI, cuerpo
+  VT323        → terminal CRT, numéricos, temporizadores, botón ?
+  Silkscreen   → display bitmap: logo, títulos, etiquetas, botones, hero
+
+Definir SIEMPRE contra variables CSS, nunca contra hexadecimal crudo.
+Paleta por defecto: SAKURA. Temas alternos vía data-theme:
+  document.documentElement.setAttribute('data-theme','amber'|'blue')
+  (Sakura = sin atributo)
+
+Tokens base (en :root):
+  --bg-screen, --bg-panel, --bg-panel-2, --bg-left
+  --phosphor-pink (texto primario)
+  --petal-white   (énfasis máximo / títulos)
+  --neon-pink     (activo/seleccionado/acentos/botón primario)
+  --celadon       (email maskeado, timer, botón ?)
+  --pink-dim      (etiquetas/subtítulos)
+  --pink-faint    (deshabilitado/placeholders/footer)
+  --glow-neon, --glow-pink, --glow-cel (tripletes RGB para halos)
+  --border
+
+Espaciado: rejilla estricta de 4px.
+  --sp-1:4px --sp-2:8px --sp-3:12px --sp-4:16px --sp-6:24px --sp-8:32px
+  --ctl-h-btn:40px   (BiosButton)
+  --ctl-h-input:36px (InputField)
+  --radius:0         (esquinas rectas ABSOLUTAS, sin excepción)
+
+
+-------------------------------------------------------------------------------
+7. EFECTOS CRT (la firma de la marca)
+-------------------------------------------------------------------------------
+
+Keyframes a definir en tokens-crt.css:
+  scanDrift   → deriva de scanlines
+  caretBlink  → cursor parpadeante en cajas de código
+  dotPulse    → pulso de puntos/indicadores
+  timerPulse  → pulso del display de temporizador
+  sweepDown   → barrido de carga (una sola vez al entrar)
+  flick       → parpadeo sutil de pantalla
+
+Overlays fijos (componente overlays-crt.jsx), siempre activos:
+  - Scanlines: repeating-linear-gradient + animation scanDrift, z-index 80
+  - Viñeta:    radial-gradient oscuro en los bordes, z-index 81
+  - Barrido:   franja de luz que baja una vez al cargar, z-index 82
+
+Recetas de bloom (usar variables --glow-*):
+  - Texto título: text-shadow con doble halo (pink + neon)
+  - Borde/panel:  box-shadow externo + inset
+  - Botón primario: box-shadow neón intenso
+  - Timer: text-shadow + animation timerPulse
+
+
+-------------------------------------------------------------------------------
+8. ICONOGRAFÍA — SPRITES PIXEL 7×7
+-------------------------------------------------------------------------------
+
+SIN icon-font ni emoji. Cada glifo es una matriz 7×7 renderizada como SVG con
+shape-rendering:crispEdges y un drop-shadow de glow.
+
+El componente glifo-pixel.jsx recibe (name, size, color, glow) y construye el
+SVG con un <rect> 1×1 por cada "#" de la matriz. Glifos disponibles:
+  pawn, grid, letters, dice, crown, petal, clock, star.
+
+(Ver matrices exactas en diseño-crt-gaming.md sección 6.)
+
+
+-------------------------------------------------------------------------------
+9. COMPONENTES BASE (recetas exactas en diseño-crt-gaming.md sección 7)
+-------------------------------------------------------------------------------
+
+  BiosButton    → altura 40px, radio 0, 4 estados (selected/inactivo/disabled/hover).
+                  El estado selected lleva prefijo "► " y glow neón.
+  InputField    → altura 36px, etiqueta Silkscreen, marcador "!" neón para
+                  obligatorio, botón "?" celadón (28×36px) a la derecha.
+  Leyenda       → "? = INFO DEL CAMPO" / "! = CAMPO OBLIGATORIO" sobre el primer campo.
+  Separador     → línea 1px con gradiente que se desvanece en los extremos.
+  Divisor split → línea vertical 1px + glow difuso 6px entre paneles.
+  Badge de tema → caja 100×24px, esquina inferior-izquierda, [ SAKURA/AMBER/BLUE ].
+
+Estilos: inline (style="…") para estilos de componente. Solo los tokens :root,
+los temas [data-theme], los @keyframes, el reset de body y el <link> de fuentes
+viven en CSS global.
+
+
+-------------------------------------------------------------------------------
+10. LAYOUT DE PANTALLAS DE AUTENTICACIÓN
+-------------------------------------------------------------------------------
+
+Desktop-first, frame base 1280 × 800 px. Layout split-panel:
+  - Columna izquierda fija: 460px (hero/branding).
+  - Columna derecha: 820px (formulario centrado en contenedor de 420px).
+  - formX = 460 + (820 - 420) / 2 = 660px
+
+Pantallas a implementar (medidas exactas en diseño-crt-gaming.md secciones 8-9):
+  - REGISTRO (CREAR CUENTA): nombre, apellido, correo, contraseña, confirmar.
+  - VERIFICACIÓN: 6 cajas de dígito 52×64px, separador "—" entre dígito 3 y 4,
+    display de timer MM:SS con timerPulse, botón REENVIAR deshabilitado hasta
+    que el timer llegue a 0.
+  - LOGIN: pendiente de diseño; acceso desde link "INICIA SESION" en Registro.
+
+Flujo de navegación:
+  REGISTRO --(► REGISTRARSE)--> VERIFICACIÓN --(► VERIFICAR CODIGO)--> LOGIN
+  VERIFICACIÓN --(REGRESAR AL REGISTRO)--> REGISTRO
+
+
+-------------------------------------------------------------------------------
+11. LÓGICA DE ESTADO Y TEMPORIZADORES
+-------------------------------------------------------------------------------
+
+Para la pantalla de verificación:
+  - timer_verificacion: arranca en 900 segundos (15:00), decrece cada segundo
+    con setInterval; limpiar el intervalo en componentWillUnmount/useEffect cleanup.
+  - fmt_mm_ss(segundos) → formatea a "MM:SS".
+  - El botón REENVIAR CODIGO está disabled mientras timer_verificacion > 0.
+
+
+-------------------------------------------------------------------------------
+12. COMUNICACIÓN EN TIEMPO REAL (servicio-socket.js)
+-------------------------------------------------------------------------------
+
+Centralizar la conexión Socket.io en servicio-socket.js. El cliente emite y
+escucha eventos con formato dominio:accion:
+
+  Emitir al terminar una partida (desde el loop del juego Canvas):
+    socket.emit("juego:partida_terminada", {
+      id_juego, id_usuario, puntaje, duracion_segundos
+    });
+
+  Escuchar actualización de leaderboard en tiempo real:
+    socket.on("juego:puntaje_actualizado", ({ id_juego, tabla_puntajes }) => {...});
+
+Eventos del cliente (ver catálogo completo en arquitectura-crt-gaming-v2.md):
+  juego:partida_iniciada, juego:partida_terminada (emitir)
+  juego:puntaje_actualizado, juego:error (escuchar)
+  usuario:conectado, usuario:desconectado (escuchar)
+  amigo:solicitud_enviada, amigo:solicitud_aceptada, amigo:solicitud_rechazada (emitir)
+  amigo:solicitud_recibida, amigo:vinculo_confirmado (escuchar)
+  sala:unirse, sala:salir (emitir)
+
+
+-------------------------------------------------------------------------------
+13. CONTENIDO Y VOZ
+-------------------------------------------------------------------------------
+
+  - Idioma: español en TODA la UI, sin texto en otros idiomas.
+  - MAYÚSCULAS en todos los elementos de UI, letter-spacing 0.10–0.16em.
+  - SIN emoji en ninguna pantalla.
+  - Tono escueto, tipo sistema: "INGRESA TUS DATOS", "CAMPO OBLIGATORIO".
+  - Emails maskeados: formato "ju***@dominio.com" en --celadon.
+  - Errores de validación: texto en --neon-pink, borde del input al 100% de
+    opacidad, prefijo "▸ ERROR:" en Silkscreen Bold.
+
+
+-------------------------------------------------------------------------------
+14. PRUEBAS, LINTING Y CHECKLIST DE FIDELIDAD
+-------------------------------------------------------------------------------
+
+  - Probar componentes con vitest + testing-library (npm test).
+  - Ejecutar eslint antes de cada commit (npm run lint).
+  - Verificar la checklist de fidelidad de diseño-crt-gaming.md sección 13:
+    radio 0 en todo, solo fuentes pixel, español+mayúsculas, scanlines+viñeta
+    activos, los tres temas recolorean vía --glow-*, etc.
+
+
+-------------------------------------------------------------------------------
+15. CONVENCIÓN DE COMMITS
+-------------------------------------------------------------------------------
+
+Formato: tipo(alcance): descripcion en español
+  feat, fix, docs, refactor, style, test
+
+Ejemplos:
+  feat(registro): implementar pantalla CREAR CUENTA con tema sakura
+  fix(timer): corregir limpieza de intervalo en pantalla de verificación
+  style(crt): ajustar bloom de BiosButton en estado hover
+
+
+-------------------------------------------------------------------------------
+16. DESPLIEGUE
+-------------------------------------------------------------------------------
+
+  - Plataforma: Vercel (CDN global, despliegue automático desde GitHub).
+  - Las variables VITE_ se configuran en el panel de Vercel.
+  - Comando de build: npm run build (genera /dist).
+  - URL de producción esperada: https://crt-gaming.vercel.app
+
+
+===============================================================================
+Referencias:
+  ../Documentacion_Proyecto/diseño-crt-gaming.md      (sistema de diseño completo)
+  ../Documentacion_Proyecto/arquitectura-crt-gaming-v2.md (eventos, convenciones)
+===============================================================================

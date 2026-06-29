@@ -1,0 +1,287 @@
+===============================================================================
+ARCADEVS — INSTRUCCIONES PARA CONSTRUIR EL BACKEND
+Versión: 1.0.0 | Basado en arquitectura-crt-gaming-v2.md y arcadevs_schema.sql
+===============================================================================
+
+Este documento describe, paso a paso, cómo construir el backend de ArcadeVS
+siguiendo la arquitectura event-driven y las convenciones del proyecto.
+Todo el código (identificadores, comentarios y commits) va en ESPAÑOL.
+
+
+-------------------------------------------------------------------------------
+1. STACK Y REQUISITOS
+-------------------------------------------------------------------------------
+
+- Node.js 20+ (LTS)
+- Fastify         → servidor HTTP de alto rendimiento con validación de schemas
+- Socket.io       → comunicación en tiempo real (bus de eventos)
+- PostgreSQL      → base de datos relacional (alojada en Supabase)
+- @supabase/supabase-js → cliente de Supabase (Auth + Storage)
+- pg              → driver de PostgreSQL para queries directas
+- dotenv          → carga de variables de entorno desde .env.local
+
+Dependencias de desarrollo:
+- nodemon         → recarga automática en desarrollo
+- vitest          → framework de pruebas
+- eslint + prettier → linting y formato consistente
+
+
+-------------------------------------------------------------------------------
+2. INICIALIZACIÓN DEL PROYECTO
+-------------------------------------------------------------------------------
+
+Dentro de la carpeta Backend_ArcadeVS:
+
+  npm init -y
+  npm install fastify socket.io @supabase/supabase-js pg dotenv
+  npm install -D nodemon vitest eslint prettier
+
+En package.json definir los scripts:
+
+  "scripts": {
+    "dev":   "nodemon src/index.js",
+    "start": "node src/index.js",
+    "test":  "vitest run",
+    "test:watch": "vitest",
+    "lint":  "eslint src/"
+  }
+
+Usar "type": "module" en package.json para emplear sintaxis ESM (import/export).
+
+
+-------------------------------------------------------------------------------
+3. ESTRUCTURA DE CARPETAS
+-------------------------------------------------------------------------------
+
+  Backend_ArcadeVS/
+  ├── src/
+  │   ├── index.js                  # Punto de entrada: arranca Fastify + Socket.io
+  │   ├── eventos/                  # Handlers de eventos Socket.io (capa de entrada)
+  │   │   ├── manejador-juego.js
+  │   │   ├── manejador-usuario.js
+  │   │   ├── manejador-amigo.js
+  │   │   └── manejador-sala.js
+  │   ├── servicios/                # Lógica de negocio (no conoce Socket.io ni SQL)
+  │   │   ├── servicio-leaderboard.js
+  │   │   ├── servicio-historial.js
+  │   │   ├── servicio-amistades.js
+  │   │   └── servicio-torneos.js
+  │   ├── repositorios/             # Acceso a PostgreSQL (única capa que escribe SQL)
+  │   │   ├── repositorio-usuario.js
+  │   │   ├── repositorio-puntaje.js
+  │   │   ├── repositorio-juego.js
+  │   │   ├── repositorio-partida.js
+  │   │   └── repositorio-amistad.js
+  │   ├── rutas/                    # Endpoints REST de Fastify (auth, perfil, catálogo)
+  │   │   ├── rutas-autenticacion.js
+  │   │   ├── rutas-usuario.js
+  │   │   └── rutas-juego.js
+  │   └── configuracion/            # Config de DB, Socket.io, Supabase y env
+  │       ├── configuracion-db.js
+  │       ├── configuracion-socket.js
+  │       └── configuracion-supabase.js
+  ├── tests/                        # Pruebas con vitest
+  ├── .env.local                    # Variables de entorno (NUNCA se sube al repo)
+  ├── .gitignore                    # Incluir node_modules/ y .env.local
+  └── package.json
+
+Regla de capas (flujo de dependencia, de afuera hacia adentro):
+
+  eventos/rutas  →  servicios  →  repositorios  →  PostgreSQL
+
+  - eventos/rutas:  reciben datos del cliente, validan formato, delegan al servicio.
+  - servicios:      contienen la lógica de negocio. NO escriben SQL ni emiten sockets.
+  - repositorios:   única capa que ejecuta consultas SQL. Retornan datos planos.
+
+  Ningún servicio llama a otro servicio directamente: la comunicación es por eventos.
+
+
+-------------------------------------------------------------------------------
+4. VARIABLES DE ENTORNO (.env.local)
+-------------------------------------------------------------------------------
+
+  # Base de datos
+  DB_URL=
+  DB_PUERTO=5432
+
+  # Autenticación (Supabase Auth — no se gestionan tokens propios)
+  SUPABASE_URL=
+  SUPABASE_CLAVE_PUBLICA=
+  SUPABASE_CLAVE_PRIVADA=
+
+  # Servidor
+  SERVIDOR_PUERTO=3000
+  SERVIDOR_ENTORNO=desarrollo
+
+IMPORTANTE: .env.local jamás se sube al repositorio. En producción las variables
+se configuran directamente en Railway.
+
+
+-------------------------------------------------------------------------------
+5. ARQUITECTURA EVENT-DRIVEN
+-------------------------------------------------------------------------------
+
+El backend gira en torno a un bus de eventos central (Socket.io Server).
+Cuando ocurre una acción significativa, el handler la recibe y notifica a los
+servicios suscritos, que reaccionan de forma independiente.
+
+Flujo del fin de partida (ejemplo de referencia):
+
+  Cliente emite "juego:partida_terminada"
+        ↓
+  manejador-juego.js  (recibe, valida payload)
+        ↓
+  BEGIN TRANSACTION
+    servicio-historial.guardar_sesion()        → partidas_jugadores
+    servicio-leaderboard.actualizar_puntaje()  → rankings_juego (atómico)
+  COMMIT
+        ↓
+  servicio-logros.verificar_logros()
+        ↓
+  Servidor emite "juego:puntaje_actualizado" con el top 10
+
+Catálogo de eventos a implementar (formato dominio:accion):
+
+  Dominio juego:
+    juego:partida_iniciada    (Cliente → Servidor)
+    juego:partida_terminada   (Cliente → Servidor)
+    juego:puntaje_actualizado (Servidor → Cliente)
+    juego:error               (Servidor → Cliente)
+
+  Dominio usuario:
+    usuario:conectado         (Servidor → Sala)
+    usuario:desconectado      (Servidor → Sala)
+    usuario:perfil_actualizado(Servidor → Cliente)
+
+  Dominio amigo:
+    amigo:solicitud_enviada   (Cliente → Servidor)
+    amigo:solicitud_recibida  (Servidor → Cliente)
+    amigo:solicitud_aceptada  (Cliente → Servidor)
+    amigo:solicitud_rechazada (Cliente → Servidor)
+    amigo:vinculo_confirmado  (Servidor → ambos)
+
+  Dominio sala:
+    sala:unirse               (Cliente → Servidor)
+    sala:salir                (Cliente → Servidor)
+
+REGLA: todo evento Socket.io se documenta en arquitectura-crt-gaming-v2.md
+ANTES de implementarse.
+
+
+-------------------------------------------------------------------------------
+6. CONVENCIONES DE CÓDIGO (OBLIGATORIAS)
+-------------------------------------------------------------------------------
+
+Idioma:         Todo identificador, comentario y commit en español.
+
+Variables:      snake_case            → const puntaje_actual = 0;
+Constantes:     SCREAMING_SNAKE_CASE  → const PUERTO_SERVIDOR = 3000;
+Funciones:      snake_case con prefijo de verbo:
+                  obtener_   → consultas que retornan datos
+                  guardar_   → persistencia en BD
+                  actualizar_→ modificación de registros
+                  eliminar_  → borrado de registros
+                  validar_   → verificación de datos
+                  emitir_    → disparo de eventos Socket.io
+                  manejar_   → handlers de eventos entrantes
+Clases:         PascalCase            → class ServicioLeaderboard {}
+Archivos:       kebab-case            → servicio-leaderboard.js
+
+Reglas estructurales:
+  1. Ningún archivo supera las 200 líneas. Si ocurre, se divide en módulos.
+  2. Toda función pública lleva comentario JSDoc en español.
+  3. Cada servicio reacciona solo a eventos; nunca llama a otro servicio.
+  4. Las variables de entorno nunca se suben al repositorio.
+
+
+-------------------------------------------------------------------------------
+7. REGLAS DE INTEGRIDAD DE BASE DE DATOS (CRÍTICAS)
+-------------------------------------------------------------------------------
+
+Estas reglas se aplican en la capa de aplicación (repositorios/servicios):
+
+  a) ATOMICIDAD DE RANKINGS:
+     Toda operación que modifique partidas_jugadores y rankings_juego debe
+     ejecutarse dentro de UNA MISMA TRANSACCIÓN. Los contadores
+     partidas_jugadas y victorias nunca deben desincronizarse.
+
+  b) ORDEN CANÓNICO DE AMISTADES:
+     Antes de INSERT en solicitudes_amistad, normalizar el orden de los UUID
+     para que id_solicitante < id_receptor. Esto respeta el CHECK de la tabla
+     y evita duplicados invertidos (A→B y B→A).
+
+  c) CONSISTENCIA PARTIDA-TORNEO:
+     Cuando id_torneo IS NOT NULL, validar que id_juego e id_modalidad de la
+     partida coincidan con los del torneo ANTES de cada INSERT
+     (función validar_consistencia_partida_torneo).
+
+  d) CHATS PRIVADOS:
+     Al crear un chat tipo 'privado', garantizar exactamente 2 participantes
+     desde la aplicación.
+
+  e) BOTS:
+     En partidas_jugadores, si es_bot = TRUE entonces id_usuario = NULL.
+     La modalidad debe tener permite_bot = TRUE.
+
+  f) RANKING SOLO SI PUNTÚA:
+     Solo actualizar rankings_juego cuando modalidad.puntua = TRUE.
+
+
+-------------------------------------------------------------------------------
+8. AUTENTICACIÓN
+-------------------------------------------------------------------------------
+
+- La autenticación se delega completamente a Supabase Auth (JWT).
+- NO existe tabla de sesiones propia: Supabase gestiona tokens, refresco y
+  expiración de forma nativa.
+- Las rutas protegidas validan el JWT de Supabase en un hook preHandler de
+  Fastify antes de ejecutar el handler.
+- Las contraseñas se almacenan como hash (bcrypt/argon2), nunca en texto plano.
+- Al registrarse, generar un codigo_amigo aleatorio de 12 caracteres (único).
+
+
+-------------------------------------------------------------------------------
+9. PRUEBAS Y CALIDAD
+-------------------------------------------------------------------------------
+
+- Probar servicios y repositorios con vitest (npm test).
+- Las pruebas más importantes cubren las reglas de integridad de la sección 7
+  (transacciones atómicas, orden canónico de amistades, consistencia torneo).
+- Ejecutar eslint antes de cada commit (npm run lint).
+
+
+-------------------------------------------------------------------------------
+10. CONVENCIÓN DE COMMITS
+-------------------------------------------------------------------------------
+
+Formato: tipo(alcance): descripcion en español
+
+  feat     → nueva funcionalidad
+  fix      → corrección de bug
+  docs     → cambios en documentación
+  refactor → refactorización sin cambio funcional
+  style    → cambios de formato
+  test     → adición o modificación de pruebas
+
+Ejemplos:
+  feat(leaderboard): agregar actualización en tiempo real vía socket
+  fix(autenticacion): corregir validación de token JWT de Supabase
+  refactor(repositorios): extraer lógica de transacción a helper compartido
+
+
+-------------------------------------------------------------------------------
+11. DESPLIEGUE
+-------------------------------------------------------------------------------
+
+- Plataforma: Railway (soporte nativo Node.js, 500h/mes gratis).
+- Las variables de entorno se configuran en el panel de Railway, no en el repo.
+- El despliegue es automático desde GitHub.
+- URL de producción esperada: https://api-crt-gaming.railway.app
+
+
+===============================================================================
+Referencias:
+  ../Documentacion_Proyecto/arquitectura-crt-gaming-v2.md
+  ../BD_ArcadeVS/arcadevs_schema.sql
+  ../BD_ArcadeVS/Esquema_BD_v2.md
+===============================================================================

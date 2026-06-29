@@ -325,6 +325,7 @@ io.on("connection", (socket) => {
 CREATE TABLE usuarios (
   id_usuario      UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nombre          VARCHAR(50) UNIQUE NOT NULL,
+  apellido        VARCHAR(50) NOT NULL,
   correo          VARCHAR(255) UNIQUE NOT NULL,
   contrasena_hash TEXT NOT NULL,
   codigo_amigo    CHAR(12) UNIQUE NOT NULL,

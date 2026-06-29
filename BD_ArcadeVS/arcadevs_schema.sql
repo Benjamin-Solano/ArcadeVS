@@ -23,6 +23,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- habilita gen_random_uuid()
 CREATE TABLE usuarios (
     id_usuario       UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
     nombre           VARCHAR(50)  UNIQUE NOT NULL,
+    apellido         VARCHAR(50)  NOT NULL,
     correo           VARCHAR(255) UNIQUE NOT NULL,
     contrasena_hash  TEXT         NOT NULL,
     codigo_amigo     CHAR(12)     UNIQUE NOT NULL,
@@ -35,6 +36,8 @@ CREATE TABLE usuarios (
 
 COMMENT ON TABLE  usuarios                  IS 'Perfiles de usuario registrados en el sistema.';
 COMMENT ON COLUMN usuarios.id_usuario       IS 'PK UUID — evita enumeración de recursos.';
+COMMENT ON COLUMN usuarios.nombre           IS 'Nombre del usuario. Único: funciona también como identificador visible (display name).';
+COMMENT ON COLUMN usuarios.apellido         IS 'Apellido del usuario. Campo obligatorio capturado en el registro.';
 COMMENT ON COLUMN usuarios.codigo_amigo     IS 'Código de 12 caracteres generado aleatoriamente al registrarse, usado para buscar amigos.';
 COMMENT ON COLUMN usuarios.contrasena_hash  IS 'Hash bcrypt/argon2. Nunca se almacena texto plano.';
 COMMENT ON COLUMN usuarios.nacionalidad     IS 'Seleccionado de una lista fija en la aplicación, no texto libre.';

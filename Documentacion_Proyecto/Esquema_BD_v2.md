@@ -9,6 +9,7 @@
 
 * **`id` — UUID, PK, generado automáticamente (`gen_random_uuid()`), no visible al usuario**
 * **`nombre_usuario` — string, obligatorio, máx. 50 caracteres, único**
+* **`apellido` — string, obligatorio, máx. 50 caracteres**
 * **`email` — string, obligatorio, único, validado por formato**
 * **`contrasena_hash` — string, obligatorio, resultado de bcrypt/argon2, nunca texto plano**
 * **`codigo_amigo` — string, 12 caracteres, único, generado aleatoriamente al crear la cuenta**
