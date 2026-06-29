@@ -15,7 +15,7 @@ Todo el código (identificadores, comentarios y commits) va en ESPAÑOL.
 - Node.js 20+ (LTS)
 - Fastify         → servidor HTTP de alto rendimiento con validación de schemas
 - Socket.io       → comunicación en tiempo real (bus de eventos)
-- PostgreSQL      → base de datos relacional (alojada en Supabase)
+- PostgreSQL      → base de datos relacional (alojada en Supabase en producción, pgAdmin4 en local)
 - @supabase/supabase-js → cliente de Supabase (Auth + Storage)
 - pg              → driver de PostgreSQL para queries directas
 - dotenv          → carga de variables de entorno desde .env.local

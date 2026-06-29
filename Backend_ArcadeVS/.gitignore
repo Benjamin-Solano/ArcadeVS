@@ -1,0 +1,18 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (nunca se suben al repositorio)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cobertura de pruebas
+coverage/
+
+# Artefactos de sistema operativo
+.DS_Store
+Thumbs.db
