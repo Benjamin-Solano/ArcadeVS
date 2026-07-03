@@ -34,6 +34,27 @@ export async function consultar(texto, parametros = []) {
 }
 
 /**
+ * Ejecuta una consulta usando un cliente de transaccion cuando se proporciona,
+ * o el pool compartido cuando no.
+ *
+ * Permite que un mismo repositorio sirva tanto para consultas sueltas como para
+ * pasos dentro de una transaccion (BEGIN/COMMIT). Es la pieza que hace posible
+ * actualizar `partidas_jugadores` y `rankings_juego` en la misma transaccion sin
+ * duplicar el codigo de acceso a datos.
+ *
+ * @param {import('pg').PoolClient|null|undefined} cliente
+ *        Cliente dedicado de una transaccion, o null/undefined para usar el pool.
+ * @param {string} texto - Sentencia SQL con placeholders ($1, $2, ...).
+ * @param {Array<any>} [parametros] - Valores para los placeholders.
+ * @returns {Promise<Array<object>>} Filas resultantes de la consulta.
+ */
+export async function consultar_con(cliente, texto, parametros = []) {
+  const ejecutor = cliente ?? pool;
+  const resultado = await ejecutor.query(texto, parametros);
+  return resultado.rows;
+}
+
+/**
  * Ejecuta una operacion dentro de una transaccion (BEGIN / COMMIT / ROLLBACK).
  *
  * Helper central para garantizar atomicidad. Las reglas de integridad del
