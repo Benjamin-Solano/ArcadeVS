@@ -15,12 +15,16 @@ import {
   verificar_conexion,
   cerrar_pool,
 } from './configuracion/configuracion-db.js';
+import { crear_socket } from './configuracion/configuracion-socket.js';
 
 const PUERTO_SERVIDOR = Number(process.env.SERVIDOR_PUERTO) || 3000;
 
 const servidor = Fastify({
   logger: true,
 });
+
+// Bus de eventos: Socket.io montado sobre el servidor HTTP de Fastify.
+const io = crear_socket(servidor.server);
 
 /**
  * Ruta de salud: confirma que el servidor responde y que la base de datos
@@ -39,6 +43,7 @@ servidor.get('/salud', async () => {
  */
 async function apagar_servidor(senal) {
   servidor.log.info(`Senal ${senal} recibida, apagando servidor...`);
+  io.close();
   await servidor.close();
   await cerrar_pool();
   process.exit(0);
@@ -61,6 +66,7 @@ async function iniciar_servidor() {
 
     await servidor.listen({ port: PUERTO_SERVIDOR });
     servidor.log.info(`Servidor ArcadeVS escuchando en el puerto ${PUERTO_SERVIDOR}.`);
+    servidor.log.info('Bus de eventos Socket.io activo.');
   } catch (error) {
     servidor.log.error(error);
     process.exit(1);

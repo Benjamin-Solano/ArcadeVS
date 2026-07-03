@@ -249,10 +249,12 @@ Donde:
 
 | Evento | Dirección | Payload | Descripción |
 |---|---|---|---|
-| `juego:partida_iniciada` | Cliente → Servidor | `{ id_juego, id_usuario }` | El usuario comienza una partida |
-| `juego:partida_terminada` | Cliente → Servidor | `{ id_juego, id_usuario, puntaje, duracion_segundos }` | La partida finalizó |
-| `juego:puntaje_actualizado` | Servidor → Cliente | `{ id_juego, tabla_puntajes[] }` | Leaderboard actualizado en tiempo real |
+| `juego:partida_iniciada` | Cliente → Servidor | `{ id_juego, id_usuario }` | El usuario comienza una partida (une el socket a la sala del juego) |
+| `juego:partida_terminada` | Cliente → Servidor | `{ id_juego, id_modalidad, id_usuario, puntaje, duracion_segundos, resultado?, id_torneo? }` | La partida finalizó |
+| `juego:puntaje_actualizado` | Servidor → Sala | `{ id_juego, tabla_puntajes[] }` | Leaderboard actualizado en tiempo real |
 | `juego:error` | Servidor → Cliente | `{ codigo, mensaje }` | Error durante la partida |
+
+> **Nota de implementación:** `juego:partida_terminada` incluye `id_modalidad` porque el servidor necesita saber si la modalidad puntúa (`modalidad.puntua`) y si permite bots antes de actualizar `rankings_juego`. El payload admite dos formas: la forma arcade de un jugador (`id_usuario`, `puntaje`, `resultado`) o la forma multijugador (`jugadores[]` con `{ id_usuario|es_bot, puntuacion, resultado }`). El campo `resultado` (`victoria`/`derrota`/`empate`) es opcional para juegos de solo puntaje.
 
 ### 5.2 Dominio: `usuario`
 
