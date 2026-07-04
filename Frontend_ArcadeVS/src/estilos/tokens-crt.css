@@ -1,0 +1,173 @@
+/*
+ * tokens-crt.css — Sistema de diseno CRT de ArcadeVS.
+ * Solo viven aqui: tokens :root, temas [data-theme], @keyframes y el reset de body.
+ * Todo estilo de componente va inline. Esquinas rectas (radio 0) sin excepcion.
+ */
+
+:root {
+  /* SAKURA (tema por defecto) */
+  --bg-screen: #1a0510;
+  --bg-panel: #240a18;
+  --bg-panel-2: #2e0e22;
+  --bg-left: #240a12;
+  --phosphor-pink: #ff8fb1;
+  --petal-white: #ffe4ec;
+  --neon-pink: #ff4d8f;
+  --celadon: #a8d8a8;
+  --pink-dim: #c46a86;
+  --pink-faint: #7a3e52;
+  --glow-neon: 255, 77, 143;
+  --glow-pink: 255, 143, 177;
+  --glow-cel: 168, 216, 168;
+  --border: rgba(255, 77, 143, 0.26);
+
+  /* Espaciado — rejilla estricta de 4px */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --line: 1px;
+  --ctl-h-btn: 40px;
+  --ctl-h-input: 36px;
+  --radius: 0;
+
+  /* Medidas del layout de autenticacion */
+  --left-w: 460px;
+  --form-w: 420px;
+}
+
+[data-theme='amber'] {
+  --bg-screen: #180e02;
+  --bg-panel: #231603;
+  --bg-panel-2: #2c1d06;
+  --bg-left: #231302;
+  --phosphor-pink: #ffcf8f;
+  --petal-white: #fff1da;
+  --neon-pink: #ff9e2e;
+  --celadon: #9fd6c2;
+  --pink-dim: #c39a5a;
+  --pink-faint: #6f5226;
+  --glow-neon: 255, 158, 46;
+  --glow-pink: 255, 207, 143;
+  --glow-cel: 159, 214, 194;
+  --border: rgba(255, 158, 46, 0.26);
+}
+
+[data-theme='blue'] {
+  --bg-screen: #02101a;
+  --bg-panel: #06192a;
+  --bg-panel-2: #0a2438;
+  --bg-left: #061522;
+  --phosphor-pink: #8fcaff;
+  --petal-white: #dcefff;
+  --neon-pink: #3da6ff;
+  --celadon: #86e0bf;
+  --pink-dim: #5a96c4;
+  --pink-faint: #26506f;
+  --glow-neon: 61, 166, 255;
+  --glow-pink: 143, 202, 255;
+  --glow-cel: 134, 224, 191;
+  --border: rgba(61, 166, 255, 0.26);
+}
+
+/* Reset de body */
+* {
+  box-sizing: border-box;
+  border-radius: 0 !important;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  font-family: 'DotGothic16', monospace;
+  color: var(--phosphor-pink);
+  background: var(--bg-screen);
+  line-height: 1.7;
+  -webkit-font-smoothing: none;
+  text-rendering: geometricPrecision;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+/* Keyframes CRT */
+@keyframes scanDrift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 6px;
+  }
+}
+
+@keyframes caretBlink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px rgba(var(--glow-neon), 0.5));
+    opacity: 1;
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(var(--glow-neon), 0.95));
+    opacity: 0.85;
+  }
+}
+
+@keyframes timerPulse {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 12px rgba(var(--glow-neon), 0.8);
+  }
+  50% {
+    opacity: 0.6;
+    text-shadow: 0 0 4px rgba(var(--glow-neon), 0.3);
+  }
+}
+
+@keyframes sweepDown {
+  0% {
+    transform: translateY(-30vh);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(130vh);
+    opacity: 0;
+  }
+}
+
+@keyframes flick {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.92;
+  }
+}
