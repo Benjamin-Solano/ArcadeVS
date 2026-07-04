@@ -30,6 +30,8 @@ CREATE TABLE usuarios (
     nacionalidad     VARCHAR(100),
     fecha_nacimiento DATE,
     avatar_url       TEXT,
+    rol              VARCHAR(20)  NOT NULL DEFAULT 'jugador'
+                     CHECK (rol IN ('jugador', 'admin')),
     fecha_registro   TIMESTAMP    NOT NULL DEFAULT NOW(),
     ultima_conexion  TIMESTAMP
 );
@@ -147,7 +149,8 @@ CREATE TABLE torneos (
                       CHECK (estado IN ('inscripcion', 'en_curso', 'finalizado')),
     fecha_inicio      TIMESTAMP,
     fecha_fin         TIMESTAMP,
-    max_participantes INTEGER      CHECK (max_participantes > 0)
+    max_participantes INTEGER      CHECK (max_participantes > 0),
+    id_creador        UUID         REFERENCES usuarios(id_usuario) ON DELETE SET NULL
 );
 
 COMMENT ON TABLE  torneos                  IS 'Torneos organizados por juego y modalidad.';
@@ -155,6 +158,7 @@ COMMENT ON COLUMN torneos.id_juego         IS 'El juego al que pertenecen todas 
 COMMENT ON COLUMN torneos.id_modalidad     IS 'La modalidad que aplica a todas las partidas del torneo.';
 COMMENT ON COLUMN torneos.estado           IS 'inscripcion → en_curso → finalizado. Transición unidireccional.';
 COMMENT ON COLUMN torneos.max_participantes IS 'Límite de inscritos. NULL = sin límite.';
+COMMENT ON COLUMN torneos.id_creador       IS 'Usuario dueño del torneo (quien lo creó). NULL si el dueño fue eliminado; entonces solo un admin puede gestionarlo.';
 
 
 -- -----------------------------------------------------------------------------
@@ -373,6 +377,8 @@ CREATE INDEX idx_torneos_juego             ON torneos (id_juego);
 CREATE INDEX idx_torneos_estado            ON torneos (estado);
 -- Torneos próximos a iniciar (orden por fecha).
 CREATE INDEX idx_torneos_fecha_inicio      ON torneos (fecha_inicio ASC);
+-- Torneos creados por un usuario ("mis torneos").
+CREATE INDEX idx_torneos_creador           ON torneos (id_creador);
 
 
 -- -----------------------------------------------------------------------------

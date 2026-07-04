@@ -21,7 +21,7 @@ The repository currently holds the database schema and architecture/design docum
 | Real-time | Socket.io |
 | Backend | Node.js + Fastify |
 | Database | PostgreSQL (Supabase) |
-| Auth | Supabase Auth (JWT — no custom session table) |
+| Auth | bcrypt (hash de contraseñas) + JWT propio firmado por el backend — no custom session table |
 | Deploy Frontend | Vercel |
 | Deploy Backend | Railway |
 
@@ -80,6 +80,7 @@ Events follow `dominio:accion` format in lowercase Spanish:
 | `usuario:conectado` | Server → Room | `id_usuario, nombre` |
 | `amigo:solicitud_enviada` | Client → Server | `id_usuario_destino` |
 | `amigo:vinculo_confirmado` | Server → Both | `id_usuario_a, id_usuario_b` |
+| `amigo:error` | Server → Client | `codigo, mensaje` |
 | `sala:unirse` | Client → Server | `id_sala` |
 
 ---
@@ -97,7 +98,7 @@ Events follow `dominio:accion` format in lowercase Spanish:
 | Files / folders | `kebab-case` | `servicio-leaderboard.js`, `pantalla-juego.jsx` |
 | DB tables | `snake_case`, plural | `usuarios`, `rankings_juego` |
 | DB columns | `snake_case` | `id_usuario`, `fecha_registro` |
-| Env vars | `SCREAMING_SNAKE_CASE` | `DB_URL`, `SUPABASE_CLAVE_PUBLICA` |
+| Env vars | `SCREAMING_SNAKE_CASE` | `DB_URL`, `SERVIDOR_JWT_SECRETO` |
 
 **Function verb prefixes:**
 
@@ -116,10 +117,11 @@ Events follow `dominio:accion` format in lowercase Spanish:
 ## Database Design Decisions
 
 - All PKs are `UUID` (`gen_random_uuid()`) — prevents resource enumeration.
-- No custom sessions table — Supabase Auth manages JWT tokens natively.
+- No custom sessions table — the backend issues stateless JWTs signed with a server secret (`SERVIDOR_JWT_SECRETO`); passwords are hashed with bcrypt.
 - `solicitudes_amistad` enforces canonical order: `id_solicitante < id_receptor`. The server must normalize UUID order before every INSERT to prevent inverted duplicates.
 - `rankings_juego` uses denormalized counters (`partidas_jugadas`, `victorias`) for performance. These must be updated atomically with `partidas_jugadores` in the same transaction.
 - The constraint `victorias <= partidas_jugadas` is a safety net against counter desync.
+- Authorization is owner-admin: `usuarios.rol` (`jugador` | `admin`) plus `torneos.id_creador`. Any user creates a tournament and owns it; starting/finishing it is allowed to the owner or an admin. Admins are granted via a protected endpoint (an admin promotes another), so the first admin is seeded manually. Roles are read fresh from the DB at authorization time (not from the JWT).
 
 The schema is in `BD_ArcadeVS/arcadevs_schema.sql`.
 
@@ -173,14 +175,14 @@ refactor(bd): migrar PKs de entero a UUID en todas las tablas
 DB_URL=
 DB_PUERTO=5432
 
-# Supabase
-SUPABASE_URL=
-SUPABASE_CLAVE_PUBLICA=
-SUPABASE_CLAVE_PRIVADA=
+# Autenticación (JWT propio — bcrypt para el hash de contraseñas)
+SERVIDOR_JWT_SECRETO=
+SERVIDOR_JWT_EXPIRACION=7d
 
 # Servidor
 SERVIDOR_PUERTO=3000
 SERVIDOR_ENTORNO=desarrollo
+CORS_ORIGEN=*
 ```
 
 Environment variables go in `.env.local` for development and in Vercel/Railway platform vars for production — never committed to the repository.

@@ -1,7 +1,7 @@
 # Esquema de Base de Datos — ArcadeVS
 **Versión:** 2.0.0 | **Fecha:** Junio 2026
 
-> Cambios respecto a v1: PKs migradas a UUID, tabla `Sesion` eliminada (delegada a Supabase Auth), restricción de duplicados invertidos en `SolicitudAmistad`, tabla `Tag` normalizada, campo `slug` agregado a `Juego`, restricciones de consistencia `Partida ↔ Torneo`, índice compuesto en `MensajeEstado`, protección de integridad en `RankingJuego`.
+> Cambios respecto a v1: PKs migradas a UUID, tabla `Sesion` eliminada (autenticación con JWT propio *stateless*, sin estado de sesión en BD), restricción de duplicados invertidos en `SolicitudAmistad`, tabla `Tag` normalizada, campo `slug` agregado a `Juego`, restricciones de consistencia `Partida ↔ Torneo`, índice compuesto en `MensajeEstado`, protección de integridad en `RankingJuego`.
 
 ---
 
@@ -11,13 +11,14 @@
 * **`nombre_usuario` — string, obligatorio, máx. 50 caracteres, único**
 * **`apellido` — string, obligatorio, máx. 50 caracteres**
 * **`email` — string, obligatorio, único, validado por formato**
-* **`contrasena_hash` — string, obligatorio, resultado de bcrypt/argon2, nunca texto plano**
+* **`contrasena_hash` — string, obligatorio, resultado de bcrypt, nunca texto plano**
 * **`codigo_amigo` — string, 12 caracteres, único, generado aleatoriamente al crear la cuenta**
 * **`nacionalidad` — string, elegido de una lista fija (no texto libre)**
 * **`fecha_nacimiento` — DATE, formato `YYYY-MM-DD` a nivel BD**
+* **`rol` — enumerado: `jugador` (por defecto) o `admin`. Los admin gestionan cualquier torneo y promueven a otros usuarios**
 * **`fecha_creacion` — DATETIME, asignado automáticamente por el sistema**
 
-> ℹ️ La gestión de sesiones y tokens JWT se delega completamente a **Supabase Auth**. No se almacenan tokens en la base de datos propia.
+> ℹ️ La autenticación se gestiona en el backend: las contraseñas se guardan hasheadas con **bcrypt** y el login emite un **JWT** firmado con un secreto del servidor. Los tokens son *stateless* y no se almacenan en la base de datos (no hay tabla de sesiones).
 
 ---
 
@@ -80,6 +81,7 @@
 * **`fecha_inicio` — DATETIME**
 * **`fecha_fin` — DATETIME**
 * **`max_participantes` — entero**
+* **`id_creador` — FK → Usuario (UUID), nullable — el dueño que creó el torneo (`ON DELETE SET NULL`)**
 
 ---
 
@@ -175,9 +177,11 @@
 
 ### **Resumen de decisiones clave**
 
-**PKs como UUID:** todas las tablas usan `UUID` generado por `gen_random_uuid()` en lugar de enteros autoincrementales. Previene enumeración de recursos por usuarios malintencionados y es consistente con Supabase.
+**PKs como UUID:** todas las tablas usan `UUID` generado por `gen_random_uuid()` en lugar de enteros autoincrementales. Previene enumeración de recursos por usuarios malintencionados.
 
-**Sesiones delegadas a Supabase Auth:** la tabla `Sesion` fue eliminada. Supabase Auth gestiona tokens JWT, expiración y estado de sesión de forma nativa, evitando dos fuentes de verdad para autenticación.
+**Autenticación propia sin tabla de sesiones:** la tabla `Sesion` fue eliminada. El backend hashea las contraseñas con bcrypt y emite JWT firmados con un secreto propio; al ser *stateless*, la expiración vive en el token y no se persiste estado de sesión en la BD, evitando dos fuentes de verdad para autenticación.
+
+**Autorización dueño-admin para torneos:** `usuarios.rol` (`jugador` | `admin`) y `torneos.id_creador` implementan un modelo mínimo de permisos. Cualquier usuario crea torneos y queda como dueño; iniciar/finalizar los permite el dueño o un admin. Los admin se otorgan vía endpoint protegido (solo un admin promueve a otro), por lo que el primer admin se siembra manualmente. `id_creador` es `ON DELETE SET NULL`: si el dueño se elimina, el torneo sobrevive y solo un admin puede gestionarlo.
 
 **Amistad bidireccional con `CHECK` de orden canónico:** `SolicitudAmistad` usa `CHECK (id_solicitante < id_receptor)` junto con `UNIQUE (id_solicitante, id_receptor)` para que no puedan coexistir `(A→B)` y `(B→A)`. Se filtra por `estado = 'aceptado'` para obtener amigos confirmados.
 
