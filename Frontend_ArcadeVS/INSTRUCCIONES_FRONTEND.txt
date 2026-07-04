@@ -20,7 +20,8 @@ peso. Esquinas rectas (radio 0) en TODOS los elementos sin excepción.
 - React + Vite    → framework de UI con HMR rápido
 - Canvas API + Vanilla JS → motor de cada juego (control total del render)
 - socket.io-client → comunicación en tiempo real con el backend
-- @supabase/supabase-js → cliente de Supabase Auth en el navegador
+  (La autenticación se hace contra las rutas REST del backend propio: se guarda
+   el JWT recibido y se envía en la cabecera Authorization de cada petición.)
 
 Dependencias de desarrollo:
 - vitest + @testing-library/react → pruebas de componentes
@@ -35,7 +36,7 @@ Dentro de la carpeta Frontend_ArcadeVS:
 
   npm create vite@latest . -- --template react
   npm install
-  npm install socket.io-client @supabase/supabase-js
+  npm install socket.io-client
   npm install -D vitest @testing-library/react eslint prettier
 
 Scripts en package.json (Vite ya los provee, agregar test):
@@ -75,7 +76,7 @@ Scripts en package.json (Vite ya los provee, agregar test):
   │   ├── servicios/                # Comunicación con API y Socket.io
   │   │   ├── servicio-socket.js
   │   │   ├── servicio-api.js
-  │   │   └── servicio-supabase.js
+  │   │   └── servicio-autenticacion.js   # login/registro + manejo del JWT
   │   ├── contextos/                # React Context para estado global
   │   │   ├── contexto-usuario.jsx
   │   │   └── contexto-tema.jsx     # Tema CRT activo (sakura/amber/blue)
@@ -121,10 +122,10 @@ Vite expone solo variables con prefijo VITE_:
 
   VITE_URL_BASE_API=http://localhost:3000
   VITE_URL_SOCKET=http://localhost:3000
-  VITE_SUPABASE_URL=
-  VITE_SUPABASE_CLAVE_PUBLICA=
 
-NUNCA incluir la clave privada de Supabase en el frontend.
+El JWT devuelto por el backend al iniciar sesión se guarda en el cliente
+(por ejemplo en localStorage) y se envía en la cabecera Authorization de las
+peticiones protegidas. NUNCA se guardan secretos del servidor en el frontend.
 .env.local jamás se sube al repositorio.
 
 

@@ -16,13 +16,18 @@ import {
   existe_correo,
   existe_nombre,
   actualizar_perfil as actualizar_perfil_bd,
+  actualizar_rol as actualizar_rol_bd,
   actualizar_ultima_conexion,
 } from '../repositorios/repositorio-usuario.js';
 import { ErrorServicio } from './error-servicio.js';
+import { exigir_admin } from './autorizacion.js';
 import { validar_datos_registro, validar_correo } from './validaciones-usuario.js';
 
 /** Factor de coste de bcrypt para el hash de contrasenas. */
 const RONDAS_BCRYPT = 10;
+
+/** Roles validos de un usuario. */
+const ROLES_VALIDOS = ['jugador', 'admin'];
 
 /** Caracteres permitidos en el codigo de amigo (sin ambiguos como O/0, I/1). */
 const ALFABETO_CODIGO_AMIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -143,6 +148,30 @@ export async function actualizar_perfil(id_usuario, datos = {}) {
     fecha_nacimiento: datos.fecha_nacimiento || null,
     avatar_url: datos.avatar_url?.trim() || null,
   });
+  if (!actualizado) {
+    throw new ErrorServicio('USUARIO_NO_ENCONTRADO', 'El usuario no existe.', 404);
+  }
+  return actualizado;
+}
+
+/**
+ * Cambia el rol de un usuario. Solo un administrador puede hacerlo (por eso el
+ * primer admin debe sembrarse manualmente en la BD).
+ *
+ * @param {string} id_solicitante - UUID de quien realiza el cambio (debe ser admin).
+ * @param {string} id_objetivo - UUID del usuario cuyo rol se cambia.
+ * @param {string} rol - Nuevo rol ('jugador' | 'admin').
+ * @returns {Promise<object>} El usuario actualizado (campos publicos).
+ */
+export async function actualizar_rol(id_solicitante, id_objetivo, rol) {
+  await exigir_admin(id_solicitante);
+  if (!ROLES_VALIDOS.includes(rol)) {
+    throw new ErrorServicio(
+      'DATOS_INVALIDOS',
+      `El rol debe ser uno de: ${ROLES_VALIDOS.join(', ')}.`,
+    );
+  }
+  const actualizado = await actualizar_rol_bd(id_objetivo, rol);
   if (!actualizado) {
     throw new ErrorServicio('USUARIO_NO_ENCONTRADO', 'El usuario no existe.', 404);
   }

@@ -12,6 +12,7 @@ import {
   autenticar_usuario,
   obtener_perfil,
   actualizar_perfil,
+  actualizar_rol,
 } from '../src/servicios/servicio-usuario.js';
 import { ErrorServicio } from '../src/servicios/error-servicio.js';
 import { consultar, cerrar_pool } from '../src/configuracion/configuracion-db.js';
@@ -114,5 +115,42 @@ describe('servicio-usuario', () => {
       nacionalidad: 'Argentina',
     });
     expect(actualizado.nacionalidad).toBe('Argentina');
+  });
+
+  it('registrar_usuario asigna el rol jugador por defecto', async () => {
+    const { usuario } = await registrar_de_prueba();
+    expect(usuario.rol).toBe('jugador');
+  });
+
+  it('actualizar_rol rechaza a un solicitante no admin (403)', async () => {
+    const { usuario: solicitante } = await registrar_de_prueba();
+    const { usuario: objetivo } = await registrar_de_prueba();
+
+    await expect(
+      actualizar_rol(solicitante.id_usuario, objetivo.id_usuario, 'admin'),
+    ).rejects.toMatchObject({ codigo: 'NO_AUTORIZADO', estado_http: 403 });
+  });
+
+  it('un admin promueve a otro usuario a admin', async () => {
+    const { usuario: admin } = await registrar_de_prueba();
+    await consultar(`UPDATE usuarios SET rol = 'admin' WHERE id_usuario = $1`, [
+      admin.id_usuario,
+    ]);
+    const { usuario: objetivo } = await registrar_de_prueba();
+
+    const promovido = await actualizar_rol(admin.id_usuario, objetivo.id_usuario, 'admin');
+    expect(promovido.rol).toBe('admin');
+  });
+
+  it('actualizar_rol rechaza un rol invalido', async () => {
+    const { usuario: admin } = await registrar_de_prueba();
+    await consultar(`UPDATE usuarios SET rol = 'admin' WHERE id_usuario = $1`, [
+      admin.id_usuario,
+    ]);
+    const { usuario: objetivo } = await registrar_de_prueba();
+
+    await expect(
+      actualizar_rol(admin.id_usuario, objetivo.id_usuario, 'superadmin'),
+    ).rejects.toMatchObject({ codigo: 'DATOS_INVALIDOS' });
   });
 });

@@ -16,8 +16,9 @@ Todo el código (identificadores, comentarios y commits) va en ESPAÑOL.
 - Fastify         → servidor HTTP de alto rendimiento con validación de schemas
 - Socket.io       → comunicación en tiempo real (bus de eventos)
 - PostgreSQL      → base de datos relacional (alojada en Supabase en producción, pgAdmin4 en local)
-- @supabase/supabase-js → cliente de Supabase (Auth + Storage)
 - pg              → driver de PostgreSQL para queries directas
+- bcryptjs        → hash de contraseñas
+- jsonwebtoken    → emisión y validación de JWT propios (autenticación)
 - dotenv          → carga de variables de entorno desde .env.local
 
 Dependencias de desarrollo:
@@ -33,7 +34,7 @@ Dependencias de desarrollo:
 Dentro de la carpeta Backend_ArcadeVS:
 
   npm init -y
-  npm install fastify socket.io @supabase/supabase-js pg dotenv
+  npm install fastify socket.io pg bcryptjs jsonwebtoken dotenv
   npm install -D nodemon vitest eslint prettier
 
 En package.json definir los scripts:
@@ -76,10 +77,10 @@ Usar "type": "module" en package.json para emplear sintaxis ESM (import/export).
   │   │   ├── rutas-autenticacion.js
   │   │   ├── rutas-usuario.js
   │   │   └── rutas-juego.js
-  │   └── configuracion/            # Config de DB, Socket.io, Supabase y env
+  │   └── configuracion/            # Config de DB, Socket.io, autenticación y env
   │       ├── configuracion-db.js
   │       ├── configuracion-socket.js
-  │       └── configuracion-supabase.js
+  │       └── configuracion-autenticacion.js   # firma/verificación de JWT
   ├── tests/                        # Pruebas con vitest
   ├── .env.local                    # Variables de entorno (NUNCA se sube al repo)
   ├── .gitignore                    # Incluir node_modules/ y .env.local
@@ -104,17 +105,18 @@ Regla de capas (flujo de dependencia, de afuera hacia adentro):
   DB_URL=
   DB_PUERTO=5432
 
-  # Autenticación (Supabase Auth — no se gestionan tokens propios)
-  SUPABASE_URL=
-  SUPABASE_CLAVE_PUBLICA=
-  SUPABASE_CLAVE_PRIVADA=
+  # Autenticación (JWT propio — bcrypt para el hash de contraseñas)
+  SERVIDOR_JWT_SECRETO=
+  SERVIDOR_JWT_EXPIRACION=7d
 
   # Servidor
   SERVIDOR_PUERTO=3000
   SERVIDOR_ENTORNO=desarrollo
+  CORS_ORIGEN=*
 
 IMPORTANTE: .env.local jamás se sube al repositorio. En producción las variables
-se configuran directamente en Railway.
+se configuran directamente en Railway. SERVIDOR_JWT_SECRETO debe ser una cadena
+larga y aleatoria, distinta entre entornos.
 
 
 -------------------------------------------------------------------------------
@@ -231,13 +233,28 @@ Estas reglas se aplican en la capa de aplicación (repositorios/servicios):
 8. AUTENTICACIÓN
 -------------------------------------------------------------------------------
 
-- La autenticación se delega completamente a Supabase Auth (JWT).
-- NO existe tabla de sesiones propia: Supabase gestiona tokens, refresco y
-  expiración de forma nativa.
-- Las rutas protegidas validan el JWT de Supabase en un hook preHandler de
-  Fastify antes de ejecutar el handler.
-- Las contraseñas se almacenan como hash (bcrypt/argon2), nunca en texto plano.
+- La autenticación se gestiona en el propio backend (sin proveedor externo).
+- Las contraseñas se almacenan como hash con bcrypt (bcryptjs), nunca en texto plano.
+- Tras un login válido, el backend firma un JWT con jsonwebtoken usando el
+  secreto SERVIDOR_JWT_SECRETO y la expiración SERVIDOR_JWT_EXPIRACION. El token
+  lleva en su payload el id_usuario.
+- NO existe tabla de sesiones propia: los JWT son stateless (la expiración vive
+  en el propio token), por lo que no se persiste estado de sesión en la BD.
+- Las rutas protegidas validan el JWT (cabecera Authorization: Bearer <token>)
+  en un hook preHandler de Fastify antes de ejecutar el handler; si es inválido
+  o falta, responden 401.
+- La firma y verificación del token se centralizan en
+  configuracion/configuracion-autenticacion.js (no repetir jsonwebtoken suelto).
 - Al registrarse, generar un codigo_amigo aleatorio de 12 caracteres (único).
+
+AUTORIZACIÓN (modelo dueño-admin):
+- usuarios.rol es 'jugador' (por defecto) o 'admin'.
+- Torneos: cualquier usuario autenticado crea un torneo y queda como dueño
+  (torneos.id_creador). Iniciar/finalizar lo permite el dueño o un admin.
+- El rol se cambia con PUT /usuarios/:id/rol, y solo un admin puede hacerlo; por
+  eso el PRIMER admin se siembra a mano en la BD (UPDATE usuarios SET rol='admin').
+- El rol se lee de la BD al autorizar (no del JWT), para que un cambio de rol
+  tenga efecto inmediato. Helpers en servicios/autorizacion.js.
 
 
 -------------------------------------------------------------------------------

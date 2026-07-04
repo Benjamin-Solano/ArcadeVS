@@ -30,7 +30,7 @@ CRT Retro Gaming es una plataforma web de videojuegos arcade clásicos jugables 
 
 - Comunicación en tiempo real entre clientes mediante WebSockets
 - Arquitectura desacoplada basada en eventos para facilitar la extensión del sistema
-- Despliegue gratuito en plataformas cloud (Vercel, Railway, Supabase)
+- Despliegue gratuito en plataformas cloud (Vercel, Railway, Supabase como Postgres gestionado)
 - Código legible, consistente y mantenible por un solo desarrollador
 
 ---
@@ -44,7 +44,7 @@ CRT Retro Gaming es una plataforma web de videojuegos arcade clásicos jugables 
 | Tiempo real | Socket.io | Abstracción robusta sobre WebSockets, soporte a eventos con namespaces |
 | Backend | Node.js + Fastify | Alto rendimiento, validación nativa de schemas JSON |
 | Base de datos | PostgreSQL (Supabase) | Relacional, confiable, tier gratuito generoso |
-| Auth | Supabase Auth (JWT) | Auth completo sin implementación manual; gestiona sesiones, tokens y expiración de forma nativa |
+| Auth | bcrypt + JWT propio | Autenticación gestionada en el backend: contraseñas hasheadas con bcrypt y JWT firmados con un secreto propio (`jsonwebtoken`); sin dependencia de un proveedor externo de auth |
 | Deploy Frontend | Vercel | CDN global, despliegue automático desde GitHub |
 | Deploy Backend | Railway | Soporte nativo Node.js, 500h/mes gratis |
 | Almacenamiento | Supabase Storage | Assets de juegos e imágenes de perfil |
@@ -219,14 +219,14 @@ Las variables de entorno usan **SCREAMING_SNAKE_CASE** con prefijo por contexto.
 DB_URL=
 DB_PUERTO=5432
 
-# Autenticación (Supabase Auth — no se gestionan tokens propios)
-SUPABASE_URL=
-SUPABASE_CLAVE_PUBLICA=
-SUPABASE_CLAVE_PRIVADA=
+# Autenticación (JWT propio — bcrypt para el hash de contraseñas)
+SERVIDOR_JWT_SECRETO=
+SERVIDOR_JWT_EXPIRACION=7d
 
 # Servidor
 SERVIDOR_PUERTO=3000
 SERVIDOR_ENTORNO=desarrollo
+CORS_ORIGEN=*
 ```
 
 ---
@@ -264,6 +264,10 @@ Donde:
 | `usuario:desconectado` | Servidor → Sala | `{ id_usuario }` | Usuario perdió conexión |
 | `usuario:perfil_actualizado` | Servidor → Cliente | `{ id_usuario, datos_perfil }` | Confirmación de actualización de perfil |
 
+> **Presencia dirigida a los amigos:** la "Sala" destino de `usuario:conectado` y `usuario:desconectado` son las salas personales `usuario:<id_usuario>` de los **amigos** del usuario. Al conectarse un socket autenticado, el servidor consulta sus amigos y emite `usuario:conectado` a cada sala personal (los amigos desconectados tienen la sala vacía, así que no reciben nada). Para no duplicar avisos con varias pestañas abiertas, la conexión se anuncia solo en el primer socket del usuario y la desconexión solo cuando se va el último (contando los sockets que siguen en su sala personal).
+
+> **Puente REST → bus (`usuario:perfil_actualizado`):** la actualización de perfil ocurre por REST (`PUT /usuarios/perfil`), pero su confirmación se difunde por el bus. Tras persistir el cambio, la ruta emite `usuario:perfil_actualizado` con `{ id_usuario, datos_perfil }` a la sala personal del dueño, de modo que **todas sus conexiones** (pestañas/dispositivos) reciban el perfil actualizado. La instancia de Socket.io se expone a las rutas como el decorador `io` de Fastify (asignado en `index.js`).
+
 ### 5.3 Dominio: `amigo`
 
 | Evento | Dirección | Payload | Descripción |
@@ -273,6 +277,9 @@ Donde:
 | `amigo:solicitud_aceptada` | Cliente → Servidor | `{ id_solicitud }` | Usuario acepta amistad |
 | `amigo:solicitud_rechazada` | Cliente → Servidor | `{ id_solicitud }` | Usuario rechaza amistad |
 | `amigo:vinculo_confirmado` | Servidor → ambos | `{ id_usuario_a, id_usuario_b }` | Amistad establecida |
+| `amigo:error` | Servidor → Cliente | `{ codigo, mensaje }` | Error al procesar una acción de amistad |
+
+> **Identidad del socket y salas personales:** los eventos de `amigo` operan sobre el usuario autenticado, no sobre un id enviado por el cliente. Al conectarse, el cliente adjunta su JWT en `handshake.auth.token`; un middleware de Socket.io lo verifica y guarda `id_usuario` en `socket.data`. El socket se une entonces a su **sala personal** `usuario:<id_usuario>`, que el servidor usa para entregarle notificaciones dirigidas (`amigo:solicitud_recibida`, `amigo:vinculo_confirmado`). Las conexiones sin token se aceptan como anónimas (solo lectura de leaderboard público); las acciones de `amigo` sin autenticar responden `amigo:error`.
 
 ### 5.4 Dominio: `sala`
 
@@ -318,9 +325,9 @@ io.on("connection", (socket) => {
 
 ## 6. Esquema de Base de Datos
 
-> **Decisión de diseño — PKs como UUID:** todas las tablas usan `UUID` generado por `gen_random_uuid()` en lugar de enteros autoincrementales. Esto previene la enumeración de recursos por usuarios malintencionados (un ID secuencial expone `/partidas/42`, `/partidas/43`, etc.) y es consistente con Supabase Auth, que también identifica usuarios con UUID.
+> **Decisión de diseño — PKs como UUID:** todas las tablas usan `UUID` generado por `gen_random_uuid()` en lugar de enteros autoincrementales. Esto previene la enumeración de recursos por usuarios malintencionados (un ID secuencial expone `/partidas/42`, `/partidas/43`, etc.).
 
-> **Decisión de diseño — Sesiones delegadas a Supabase Auth:** no existe tabla `sesiones` propia. Supabase Auth gestiona tokens JWT, refresco, expiración y estado de sesión de forma nativa. Mantener una tabla propia duplicaría la fuente de verdad y generaría inconsistencias.
+> **Decisión de diseño — Autenticación propia con JWT sin tabla de sesiones:** no existe tabla `sesiones` propia. El backend hashea las contraseñas con **bcrypt** y, tras un login válido, firma un **JWT** con un secreto del servidor (`SERVIDOR_JWT_SECRETO`) mediante `jsonwebtoken`. Los tokens son *stateless*: la validez y expiración van dentro del propio token, por lo que no se persiste estado de sesión en la BD. Las rutas protegidas validan el JWT en un hook `preHandler` de Fastify antes del handler.
 
 ```sql
 -- Usuarios del sistema
@@ -334,6 +341,7 @@ CREATE TABLE usuarios (
   nacionalidad    VARCHAR(100),
   fecha_nacimiento DATE,
   avatar_url      TEXT,
+  rol             VARCHAR(20) NOT NULL DEFAULT 'jugador' CHECK (rol IN ('jugador', 'admin')),
   fecha_registro  TIMESTAMP DEFAULT NOW(),
   ultima_conexion TIMESTAMP
 );
@@ -393,7 +401,8 @@ CREATE TABLE torneos (
   estado             VARCHAR(20) CHECK (estado IN ('inscripcion', 'en_curso', 'finalizado')),
   fecha_inicio       TIMESTAMP,
   fecha_fin          TIMESTAMP,
-  max_participantes  INTEGER
+  max_participantes  INTEGER,
+  id_creador         UUID REFERENCES usuarios(id_usuario) ON DELETE SET NULL
 );
 
 -- Participantes de torneo
@@ -575,8 +584,8 @@ Usuario A (Cliente)         Servidor              Usuario B (Cliente)
 |---|---|---|
 | Frontend | Vercel | `https://crt-gaming.vercel.app` |
 | Backend | Railway | `https://api-crt-gaming.railway.app` |
-| Base de datos | Supabase | Gestionado internamente |
-| Auth | Supabase Auth | Gestionado internamente |
+| Base de datos | Supabase (Postgres gestionado) | Gestionado internamente |
+| Auth | Backend propio (bcrypt + JWT) | Secreto JWT en variables de Railway |
 
 ### Variables de entorno por entorno
 

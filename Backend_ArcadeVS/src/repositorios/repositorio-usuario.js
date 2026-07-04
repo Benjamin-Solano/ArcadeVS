@@ -18,7 +18,7 @@ import { consultar } from '../configuracion/configuracion-db.js';
  */
 const CAMPOS_PUBLICOS = `
   id_usuario, nombre, apellido, correo, codigo_amigo,
-  nacionalidad, fecha_nacimiento, avatar_url, fecha_registro, ultima_conexion
+  nacionalidad, fecha_nacimiento, avatar_url, rol, fecha_registro, ultima_conexion
 `;
 
 /**
@@ -165,6 +165,21 @@ export async function actualizar_perfil(id_usuario, datos) {
     [id_usuario, nacionalidad, fecha_nacimiento, avatar_url],
   );
 
+  return filas[0] ?? null;
+}
+
+/**
+ * Actualiza el rol de un usuario ('jugador' | 'admin').
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @param {string} rol - Nuevo rol.
+ * @returns {Promise<object|null>} El usuario actualizado o null si no existe.
+ */
+export async function actualizar_rol(id_usuario, rol) {
+  const filas = await consultar(
+    `UPDATE usuarios SET rol = $2 WHERE id_usuario = $1 RETURNING ${CAMPOS_PUBLICOS}`,
+    [id_usuario, rol],
+  );
   return filas[0] ?? null;
 }
 
