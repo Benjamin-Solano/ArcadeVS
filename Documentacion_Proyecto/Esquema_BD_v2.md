@@ -2,6 +2,8 @@
 **Versión:** 2.0.0 | **Fecha:** Junio 2026
 
 > Cambios respecto a v1: PKs migradas a UUID, tabla `Sesion` eliminada (autenticación con JWT propio *stateless*, sin estado de sesión en BD), restricción de duplicados invertidos en `SolicitudAmistad`, tabla `Tag` normalizada, campo `slug` agregado a `Juego`, restricciones de consistencia `Partida ↔ Torneo`, índice compuesto en `MensajeEstado`, protección de integridad en `RankingJuego`.
+>
+> Cambios posteriores (migraciones incrementales sobre `arcadevs_schema.sql`): `migracion-001` — modelo de autorización dueño-admin (`Usuario.rol`, `Torneo.id_creador`); `migracion-002` — verificación de correo (`Usuario.verificado` + tabla `CodigoVerificacion`).
 
 ---
 
@@ -16,9 +18,27 @@
 * **`nacionalidad` — string, elegido de una lista fija (no texto libre)**
 * **`fecha_nacimiento` — DATE, formato `YYYY-MM-DD` a nivel BD**
 * **`rol` — enumerado: `jugador` (por defecto) o `admin`. Los admin gestionan cualquier torneo y promueven a otros usuarios**
+* **`verificado` — booleano, por defecto `false`. Bloquea el login hasta que el usuario confirma su correo con el código de verificación**
 * **`fecha_creacion` — DATETIME, asignado automáticamente por el sistema**
 
 > ℹ️ La autenticación se gestiona en el backend: las contraseñas se guardan hasheadas con **bcrypt** y el login emite un **JWT** firmado con un secreto del servidor. Los tokens son *stateless* y no se almacenan en la base de datos (no hay tabla de sesiones).
+
+> ℹ️ La verificación de correo es obligatoria antes del primer login: el registro crea al usuario con `verificado = false` y emite un código (ver **CodigoVerificacion**); `login` responde `403 CUENTA_NO_VERIFICADA` hasta confirmarlo.
+
+---
+
+#### **1b. CodigoVerificacion**
+
+* **`id` — UUID, PK, generado automáticamente**
+* **`id_usuario` — FK → Usuario (UUID), `ON DELETE CASCADE`**
+* **`codigo_hash` — string, hash **bcrypt** del código de 6 dígitos (nunca se guarda en texto plano)**
+* **`expira_en` — DATETIME, instante de expiración (15 minutos por defecto)**
+* **`usado` — booleano, por defecto `false`. Se marca `true` al consumirse o al emitirse uno nuevo**
+* **`intentos` — entero, por defecto `0`. Cuenta intentos fallidos; red de seguridad contra fuerza bruta**
+* **`fecha_creacion` — DATETIME**
+* **Índice:** `(id_usuario)` — buscar el código vigente de un usuario (verificación y reenvío)
+
+> ℹ️ Emitir un código nuevo marca los anteriores del usuario como `usado = true`, garantizando **como máximo un código vigente** por usuario. El envío de correo lo hace Nodemailer (Gmail SMTP); en modo desarrollo (`CORREO_HABILITADO=false`) el código solo se imprime en la consola del backend.
 
 ---
 
@@ -180,6 +200,8 @@
 **PKs como UUID:** todas las tablas usan `UUID` generado por `gen_random_uuid()` en lugar de enteros autoincrementales. Previene enumeración de recursos por usuarios malintencionados.
 
 **Autenticación propia sin tabla de sesiones:** la tabla `Sesion` fue eliminada. El backend hashea las contraseñas con bcrypt y emite JWT firmados con un secreto propio; al ser *stateless*, la expiración vive en el token y no se persiste estado de sesión en la BD, evitando dos fuentes de verdad para autenticación.
+
+**Verificación de correo obligatoria:** `Usuario.verificado` bloquea el login hasta confirmar el correo. Los códigos viven en `CodigoVerificacion` hasheados con bcrypt, con expiración e intentos limitados; emitir uno nuevo invalida el anterior (máximo un código vigente por usuario). Envío por Nodemailer (Gmail SMTP), con modo desarrollo que imprime el código en consola para no depender de correo real en pruebas.
 
 **Autorización dueño-admin para torneos:** `usuarios.rol` (`jugador` | `admin`) y `torneos.id_creador` implementan un modelo mínimo de permisos. Cualquier usuario crea torneos y queda como dueño; iniciar/finalizar los permite el dueño o un admin. Los admin se otorgan vía endpoint protegido (solo un admin promueve a otro), por lo que el primer admin se siembra manualmente. `id_creador` es `ON DELETE SET NULL`: si el dueño se elimina, el torneo sobrevive y solo un admin puede gestionarlo.
 

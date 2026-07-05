@@ -72,6 +72,23 @@
   --border: rgba(61, 166, 255, 0.26);
 }
 
+[data-theme='grey'] {            /* CRT GREY (monocromo) */
+  --bg-screen: #0b0d0e;
+  --bg-panel: #15181a;
+  --bg-panel-2: #1e2225;
+  --bg-left: #0f1213;
+  --phosphor-pink: #a7b1b7;
+  --petal-white: #f0f4f6;
+  --neon-pink: #cdd6db;
+  --celadon: #9fbcb2;
+  --pink-dim: #7e8a91;
+  --pink-faint: #464f55;
+  --glow-neon: 205, 214, 219;
+  --glow-pink: 240, 244, 246;
+  --glow-cel: 159, 188, 178;
+  --border: rgba(205, 214, 219, 0.26);
+}
+
 /* Reset de body */
 * {
   box-sizing: border-box;

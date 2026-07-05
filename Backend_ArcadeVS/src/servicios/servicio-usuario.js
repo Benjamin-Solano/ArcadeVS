@@ -22,6 +22,7 @@ import {
 import { ErrorServicio } from './error-servicio.js';
 import { exigir_admin } from './autorizacion.js';
 import { validar_datos_registro, validar_correo } from './validaciones-usuario.js';
+import { crear_y_enviar_codigo } from './servicio-verificacion.js';
 
 /** Factor de coste de bcrypt para el hash de contrasenas. */
 const RONDAS_BCRYPT = 10;
@@ -67,8 +68,14 @@ async function generar_codigo_amigo() {
  * Registra un usuario nuevo: valida los datos, verifica unicidad de correo y
  * nombre, hashea la contrasena y persiste el usuario.
  *
+ * La cuenta se crea como NO verificada y se emite un código de verificación
+ * que se envía al correo. El login queda bloqueado hasta que el usuario lo
+ * confirme (ver autenticar_usuario y servicio-verificacion).
+ *
  * @param {object} datos_crudos - Datos recibidos del cliente.
- * @returns {Promise<object>} El usuario creado (campos publicos, sin hash).
+ * @returns {Promise<{usuario: object, codigo: string}>} El usuario creado
+ *          (campos públicos, sin hash) y el código en claro (para exponerlo
+ *          solo en modo desarrollo).
  */
 export async function registrar_usuario(datos_crudos) {
   const datos = validar_datos_registro(datos_crudos);
@@ -83,7 +90,7 @@ export async function registrar_usuario(datos_crudos) {
   const contrasena_hash = await bcrypt.hash(datos.contrasena, RONDAS_BCRYPT);
   const codigo_amigo = await generar_codigo_amigo();
 
-  return guardar_usuario({
+  const usuario = await guardar_usuario({
     nombre: datos.nombre,
     apellido: datos.apellido,
     correo: datos.correo,
@@ -92,6 +99,9 @@ export async function registrar_usuario(datos_crudos) {
     nacionalidad: datos.nacionalidad,
     fecha_nacimiento: datos.fecha_nacimiento,
   });
+
+  const codigo = await crear_y_enviar_codigo(usuario.id_usuario, usuario.correo);
+  return { usuario, codigo };
 }
 
 /**
@@ -114,6 +124,14 @@ export async function autenticar_usuario(correo, contrasena) {
       'CREDENCIALES_INVALIDAS',
       'Correo o contrasena incorrectos.',
       401,
+    );
+  }
+
+  if (!credenciales.verificado) {
+    throw new ErrorServicio(
+      'CUENTA_NO_VERIFICADA',
+      'Debes verificar tu correo antes de iniciar sesion.',
+      403,
     );
   }
 

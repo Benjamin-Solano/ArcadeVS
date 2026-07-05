@@ -42,9 +42,11 @@ CRT Retro Gaming es una plataforma web de videojuegos arcade clásicos jugables 
 | Frontend | React + Vite | Ecosistema maduro, HMR rápido, conocimiento previo |
 | Juegos | Canvas API + Vanilla JS | Control total del render, sin dependencias externas |
 | Tiempo real | Socket.io | Abstracción robusta sobre WebSockets, soporte a eventos con namespaces |
-| Backend | Node.js + Fastify | Alto rendimiento, validación nativa de schemas JSON |
+| Cliente HTTP | axios | Instancia única (`servicio-api.js`) con interceptores para el token JWT y la normalización de errores del backend |
+| Backend | Node.js + Fastify (+ `@fastify/cors`) | Alto rendimiento, validación nativa de schemas JSON; CORS habilitado para el frontend |
 | Base de datos | PostgreSQL (Supabase) | Relacional, confiable, tier gratuito generoso |
 | Auth | bcrypt + JWT propio | Autenticación gestionada en el backend: contraseñas hasheadas con bcrypt y JWT firmados con un secreto propio (`jsonwebtoken`); sin dependencia de un proveedor externo de auth |
+| Correo | Nodemailer + Gmail SMTP | Verificación de cuenta por código de 6 dígitos; gratuito (contraseña de aplicación de Gmail), con modo desarrollo que imprime el código en consola |
 | Deploy Frontend | Vercel | CDN global, despliegue automático desde GitHub |
 | Deploy Backend | Railway | Soporte nativo Node.js, 500h/mes gratis |
 | Almacenamiento | Supabase Storage | Assets de juegos e imágenes de perfil |
@@ -227,7 +229,19 @@ SERVIDOR_JWT_EXPIRACION=7d
 SERVIDOR_PUERTO=3000
 SERVIDOR_ENTORNO=desarrollo
 CORS_ORIGEN=*
+
+# Correo de verificación (Gmail SMTP — gratis)
+# CORREO_HABILITADO=false → modo desarrollo: el código se imprime en consola, no se envía correo real.
+CORREO_HABILITADO=false
+SMTP_HOST=smtp.gmail.com
+SMTP_PUERTO=587
+SMTP_USUARIO=
+SMTP_CONTRASENA=            # contraseña de aplicación de Gmail (16 caracteres, sin espacios)
+CORREO_REMITENTE="ArcadeVS <tucorreo@gmail.com>"
+CODIGO_VERIFICACION_EXPIRA_MIN=15
 ```
+
+El **frontend** usa variables con prefijo `VITE_` en su propio `.env.local`: `VITE_URL_BASE_API` y `VITE_URL_SOCKET` (ambas `http://localhost:3000` en desarrollo).
 
 ---
 
@@ -329,6 +343,8 @@ io.on("connection", (socket) => {
 
 > **Decisión de diseño — Autenticación propia con JWT sin tabla de sesiones:** no existe tabla `sesiones` propia. El backend hashea las contraseñas con **bcrypt** y, tras un login válido, firma un **JWT** con un secreto del servidor (`SERVIDOR_JWT_SECRETO`) mediante `jsonwebtoken`. Los tokens son *stateless*: la validez y expiración van dentro del propio token, por lo que no se persiste estado de sesión en la BD. Las rutas protegidas validan el JWT en un hook `preHandler` de Fastify antes del handler.
 
+> **Decisión de diseño — Verificación de correo por código:** `usuarios.verificado` (booleano, por defecto `false`) bloquea el login hasta que el usuario confirma su correo. Los códigos de 6 dígitos viven en `codigos_verificacion`, **hasheados con bcrypt** (nunca en texto plano), con expiración (`expira_en`, 15 min por defecto) y un contador de `intentos` como red de seguridad contra fuerza bruta. Emitir un código nuevo marca los anteriores como `usado`, de modo que hay como máximo un código vigente por usuario. El envío usa Nodemailer (Gmail SMTP); en modo desarrollo (`CORREO_HABILITADO=false`) solo se imprime el código en consola.
+
 ```sql
 -- Usuarios del sistema
 CREATE TABLE usuarios (
@@ -342,9 +358,22 @@ CREATE TABLE usuarios (
   fecha_nacimiento DATE,
   avatar_url      TEXT,
   rol             VARCHAR(20) NOT NULL DEFAULT 'jugador' CHECK (rol IN ('jugador', 'admin')),
+  verificado      BOOLEAN NOT NULL DEFAULT FALSE, -- gate del login hasta confirmar el correo
   fecha_registro  TIMESTAMP DEFAULT NOW(),
   ultima_conexion TIMESTAMP
 );
+
+-- Códigos de verificación de correo (un solo uso, hasheados, con expiración)
+CREATE TABLE codigos_verificacion (
+  id_codigo      UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id_usuario     UUID REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+  codigo_hash    TEXT NOT NULL,        -- bcrypt del código de 6 dígitos, nunca texto plano
+  expira_en      TIMESTAMP NOT NULL,   -- 15 min por defecto
+  usado          BOOLEAN NOT NULL DEFAULT FALSE,
+  intentos       INTEGER NOT NULL DEFAULT 0, -- red de seguridad contra fuerza bruta
+  fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_codigos_usuario ON codigos_verificacion (id_usuario);
 
 -- Catálogo de juegos
 CREATE TABLE juegos (
@@ -539,6 +568,42 @@ crt-retro-gaming/
 ---
 
 ## 8. Flujos Principales del Sistema
+
+### 8.0 Flujo: Registro, Verificación de Correo e Inicio de Sesión
+
+Es un flujo **REST** (`/auth`, no Socket.io). El registro ya **no** abre sesión: la cuenta nace no verificada y el login queda bloqueado hasta confirmar el código enviado por correo.
+
+```
+Cliente (React)              Backend (Fastify)               Base de Datos / Correo
+   │                              │                                  │
+   │── POST /auth/registro ──────►│                                  │
+   │   { nombre, apellido,        │── guardar_usuario() ────────────►│ (usuarios, verificado=false)
+   │     correo, contrasena }     │── crear_y_enviar_codigo() ──────►│ (codigos_verificacion, hasheado)
+   │                              │── enviar_codigo_verificacion() ─►📧 (Nodemailer / consola en dev)
+   │◄── 201 { usuario,            │                                  │
+   │    pendiente_verificacion }  │   (sin token)                    │
+   │                              │                                  │
+   │── POST /auth/verificar ─────►│                                  │
+   │   { correo, codigo }         │── bcrypt.compare(codigo) ───────►│ (código vigente y no usado)
+   │                              │── marcar_verificado() ──────────►│ (usuarios.verificado=true)
+   │◄── 200 { usuario,            │                                  │
+   │    verificado }              │                                  │
+   │                              │                                  │
+   │── POST /auth/login ─────────►│                                  │
+   │   { correo, contrasena }     │── verifica hash + verificado ───►│
+   │◄── 200 { usuario, token } ───│   (403 CUENTA_NO_VERIFICADA si no está verificado)
+```
+
+**Endpoints de autenticación (`/auth`):**
+
+| Endpoint | Body | Respuesta |
+|---|---|---|
+| `POST /auth/registro` | `nombre, apellido, correo, contrasena` | `201 { usuario, pendiente_verificacion }` (+ `codigo_dev` solo si `SERVIDOR_ENTORNO=desarrollo`) |
+| `POST /auth/verificar` | `correo, codigo` | `200 { usuario, verificado }` |
+| `POST /auth/reenviar` | `correo` | `200 { pendiente_verificacion }` (invalida el código anterior) |
+| `POST /auth/login` | `correo, contrasena` | `200 { usuario, token }` · `403 CUENTA_NO_VERIFICADA` si falta verificar |
+
+> El código se guarda **hasheado con bcrypt**, con expiración de 15 min y límite de intentos. En el frontend, `servicio-api.js` (axios) adjunta el JWT en cada petición y normaliza los errores `{ codigo, mensaje }` del backend a mensajes legibles; la sesión se persiste en `localStorage` solo tras un login válido.
 
 ### 8.1 Flujo: Fin de Partida y Actualización de Leaderboard
 

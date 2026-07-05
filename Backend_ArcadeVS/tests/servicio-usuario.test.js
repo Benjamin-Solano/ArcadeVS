@@ -6,6 +6,9 @@
 
 import '../src/configuracion/cargar-entorno.js';
 
+// Evita enviar correos reales durante las pruebas (modo desarrollo del correo).
+process.env.CORREO_HABILITADO = 'false';
+
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   registrar_usuario,
@@ -33,9 +36,14 @@ function datos_registro_unicos() {
 /** Registra un usuario y guarda su id para limpieza. */
 async function registrar_de_prueba(extra = {}) {
   const datos = { ...datos_registro_unicos(), ...extra };
-  const usuario = await registrar_usuario(datos);
+  const { usuario, codigo } = await registrar_usuario(datos);
   ids_creados.push(usuario.id_usuario);
-  return { datos, usuario };
+  return { datos, usuario, codigo };
+}
+
+/** Marca un usuario como verificado (para poder iniciar sesión en las pruebas). */
+async function verificar_de_prueba(id_usuario) {
+  await consultar('UPDATE usuarios SET verificado = TRUE WHERE id_usuario = $1', [id_usuario]);
 }
 
 afterAll(async () => {
@@ -88,10 +96,19 @@ describe('servicio-usuario', () => {
 
   it('autenticar_usuario acepta credenciales correctas', async () => {
     const { datos, usuario } = await registrar_de_prueba();
+    await verificar_de_prueba(usuario.id_usuario);
 
     const autenticado = await autenticar_usuario(datos.correo, datos.contrasena);
     expect(autenticado.id_usuario).toBe(usuario.id_usuario);
     expect(autenticado).not.toHaveProperty('contrasena_hash');
+  });
+
+  it('autenticar_usuario rechaza una cuenta no verificada (403)', async () => {
+    const { datos } = await registrar_de_prueba();
+
+    await expect(
+      autenticar_usuario(datos.correo, datos.contrasena),
+    ).rejects.toMatchObject({ codigo: 'CUENTA_NO_VERIFICADA', estado_http: 403 });
   });
 
   it('autenticar_usuario rechaza contrasena incorrecta', async () => {

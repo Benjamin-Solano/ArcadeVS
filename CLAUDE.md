@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ArcadeVS** (CRT Retro Gaming) is a browser-based platform for classic arcade games with a CRT phosphor screen aesthetic. The system handles user profiles, match history, friend lists, leaderboards per game, and tournaments — all in real time.
 
-The repository currently holds the database schema and architecture/design documentation. The application code (frontend and backend) is to be developed following the specs in `Documentacion_Proyecto/`.
+The repository holds the database schema (`BD_ArcadeVS/`), architecture/design docs (`Documentacion_Proyecto/`), the Fastify backend (`Backend_ArcadeVS/`), and the React frontend (`Frontend_ArcadeVS/`). Implemented so far: user registration with email verification, login (JWT), profiles, friends, tournaments, and the real-time match/leaderboard flow. Everything follows the specs in `Documentacion_Proyecto/`.
 
 ---
 
@@ -17,11 +17,13 @@ The repository currently holds the database schema and architecture/design docum
 | Layer | Technology |
 |---|---|
 | Frontend | React + Vite |
+| HTTP client | axios (instancia única en `servicio-api.js`) |
 | Games | Canvas API + Vanilla JS |
 | Real-time | Socket.io |
-| Backend | Node.js + Fastify |
+| Backend | Node.js + Fastify (+ `@fastify/cors`) |
 | Database | PostgreSQL (Supabase) |
 | Auth | bcrypt (hash de contraseñas) + JWT propio firmado por el backend — no custom session table |
+| Email | Nodemailer + Gmail SMTP — verificación de cuenta por código de 6 dígitos |
 | Deploy Frontend | Vercel |
 | Deploy Backend | Railway |
 
@@ -57,7 +59,7 @@ backend/src/
 frontend/src/
 ├── componentes/    # Reusable React components
 ├── juegos/         # Each game as an independent module (logica + renderizador)
-├── servicios/      # servicio-socket.js, servicio-api.js
+├── servicios/      # servicio-api.js (axios), servicio-autenticacion.js, almacenamiento-sesion.js, servicio-socket.js
 ├── contextos/      # React Context for global state
 └── paginas/        # Main views/screens
 ```
@@ -82,6 +84,19 @@ Events follow `dominio:accion` format in lowercase Spanish:
 | `amigo:vinculo_confirmado` | Server → Both | `id_usuario_a, id_usuario_b` |
 | `amigo:error` | Server → Client | `codigo, mensaje` |
 | `sala:unirse` | Client → Server | `id_sala` |
+
+### REST Auth Endpoints (`/auth`)
+
+CORS is enabled on Fastify via `@fastify/cors` (origin from `CORS_ORIGEN`) so the browser frontend can call these.
+
+| Endpoint | Body | Response |
+|---|---|---|
+| `POST /auth/registro` | `nombre, apellido, correo, contrasena` | `201 { usuario, pendiente_verificacion }` (+ `codigo_dev` only when `SERVIDOR_ENTORNO=desarrollo`). **No token** — account is created unverified and a 6-digit code is emailed. |
+| `POST /auth/verificar` | `correo, codigo` | `200 { usuario, verificado }` — activates the account. |
+| `POST /auth/reenviar` | `correo` | `200 { pendiente_verificacion }` — issues a fresh code (invalidates the previous one). |
+| `POST /auth/login` | `correo, contrasena` | `200 { usuario, token }`. Returns `403 CUENTA_NO_VERIFICADA` until the email is verified. |
+
+**Account verification flow:** `registro` (creates unverified user + emails code) → `verificar` (confirms code, sets `usuarios.verificado = true`) → `login` (blocked with 403 until verified). Codes are stored bcrypt-hashed in `codigos_verificacion` with a 15-min expiry and a max-attempts guard. Email is sent by `servicio-correo.js`; with `CORREO_HABILITADO=false` it only logs the code to the console (dev mode), so tests never send real mail.
 
 ---
 
@@ -122,8 +137,9 @@ Events follow `dominio:accion` format in lowercase Spanish:
 - `rankings_juego` uses denormalized counters (`partidas_jugadas`, `victorias`) for performance. These must be updated atomically with `partidas_jugadores` in the same transaction.
 - The constraint `victorias <= partidas_jugadas` is a safety net against counter desync.
 - Authorization is owner-admin: `usuarios.rol` (`jugador` | `admin`) plus `torneos.id_creador`. Any user creates a tournament and owns it; starting/finishing it is allowed to the owner or an admin. Admins are granted via a protected endpoint (an admin promotes another), so the first admin is seeded manually. Roles are read fresh from the DB at authorization time (not from the JWT).
+- Email verification: `usuarios.verificado` (bool, default false) gates login. Codes live in `codigos_verificacion` (bcrypt-hashed `codigo_hash`, `expira_en`, `usado`, `intentos`) — never plaintext. Issuing a new code marks the previous unused ones `usado = true`, so at most one code is valid per user.
 
-The schema is in `BD_ArcadeVS/arcadevs_schema.sql`.
+The schema is in `BD_ArcadeVS/arcadevs_schema.sql`. Incremental changes ship as idempotent migrations (`BD_ArcadeVS/migracion-XXX-*.sql`, run manually against the local DB): `001` (owner-admin authorization), `002` (email verification).
 
 ---
 
@@ -183,6 +199,20 @@ SERVIDOR_JWT_EXPIRACION=7d
 SERVIDOR_PUERTO=3000
 SERVIDOR_ENTORNO=desarrollo
 CORS_ORIGEN=*
+
+# Correo de verificación (Gmail SMTP — gratis)
+# CORREO_HABILITADO=false → modo desarrollo: el código se imprime en consola, no se envía correo real.
+# Para envío real: activar verificación en 2 pasos en Gmail, generar una "contraseña de aplicación"
+# de 16 caracteres, ponerla en SMTP_CONTRASENA y cambiar CORREO_HABILITADO=true.
+CORREO_HABILITADO=false
+SMTP_HOST=smtp.gmail.com
+SMTP_PUERTO=587
+SMTP_USUARIO=
+SMTP_CONTRASENA=
+CORREO_REMITENTE="ArcadeVS <tucorreo@gmail.com>"
+CODIGO_VERIFICACION_EXPIRA_MIN=15
 ```
+
+The **frontend** reads its own vars (prefixed `VITE_`) from `Frontend_ArcadeVS/.env.local`: `VITE_URL_BASE_API` and `VITE_URL_SOCKET` (both `http://localhost:3000` in dev).
 
 Environment variables go in `.env.local` for development and in Vercel/Railway platform vars for production — never committed to the repository.

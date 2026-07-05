@@ -32,6 +32,7 @@ CREATE TABLE usuarios (
     avatar_url       TEXT,
     rol              VARCHAR(20)  NOT NULL DEFAULT 'jugador'
                      CHECK (rol IN ('jugador', 'admin')),
+    verificado       BOOLEAN      NOT NULL DEFAULT FALSE,
     fecha_registro   TIMESTAMP    NOT NULL DEFAULT NOW(),
     ultima_conexion  TIMESTAMP
 );
@@ -43,6 +44,32 @@ COMMENT ON COLUMN usuarios.apellido         IS 'Apellido del usuario. Campo obli
 COMMENT ON COLUMN usuarios.codigo_amigo     IS 'Código de 12 caracteres generado aleatoriamente al registrarse, usado para buscar amigos.';
 COMMENT ON COLUMN usuarios.contrasena_hash  IS 'Hash bcrypt/argon2. Nunca se almacena texto plano.';
 COMMENT ON COLUMN usuarios.nacionalidad     IS 'Seleccionado de una lista fija en la aplicación, no texto libre.';
+COMMENT ON COLUMN usuarios.verificado       IS 'FALSE hasta que el usuario confirma su correo con el código de verificación. El login se bloquea mientras sea FALSE.';
+
+
+-- -----------------------------------------------------------------------------
+-- 1b. codigos_verificacion
+-- -----------------------------------------------------------------------------
+-- Códigos de verificación de correo de un solo uso. El código se guarda
+-- hasheado (bcrypt), nunca en texto plano. Al emitir uno nuevo, los anteriores
+-- del usuario se marcan usado = TRUE. intentos limita la fuerza bruta.
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE codigos_verificacion (
+    id_codigo      UUID      DEFAULT gen_random_uuid() PRIMARY KEY,
+    id_usuario     UUID      NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    codigo_hash    TEXT      NOT NULL,
+    expira_en      TIMESTAMP NOT NULL,
+    usado          BOOLEAN   NOT NULL DEFAULT FALSE,
+    intentos       INTEGER   NOT NULL DEFAULT 0,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE  codigos_verificacion             IS 'Códigos de verificación de correo de un solo uso, hasheados y con expiración.';
+COMMENT ON COLUMN codigos_verificacion.codigo_hash IS 'Hash bcrypt del código de 6 dígitos. Nunca se almacena texto plano.';
+COMMENT ON COLUMN codigos_verificacion.expira_en   IS 'Instante en que el código deja de ser válido (por defecto 15 minutos tras crearse).';
+COMMENT ON COLUMN codigos_verificacion.usado       IS 'TRUE cuando el código ya se consumió o fue invalidado por uno nuevo.';
+COMMENT ON COLUMN codigos_verificacion.intentos    IS 'Intentos fallidos de verificación. Red de seguridad contra fuerza bruta.';
 
 
 -- -----------------------------------------------------------------------------
@@ -339,6 +366,13 @@ COMMENT ON COLUMN mensajes_estado.estado     IS 'Transición unidireccional: env
 CREATE INDEX idx_usuarios_codigo_amigo     ON usuarios (codigo_amigo);
 -- Filtrar usuarios activos recientemente (lobby, presencia online).
 CREATE INDEX idx_usuarios_ultima_conexion  ON usuarios (ultima_conexion DESC);
+
+
+-- -----------------------------------------------------------------------------
+-- codigos_verificacion
+-- -----------------------------------------------------------------------------
+-- Buscar el código vigente de un usuario (verificación y reenvío).
+CREATE INDEX idx_codigos_usuario           ON codigos_verificacion (id_usuario);
 
 
 -- -----------------------------------------------------------------------------

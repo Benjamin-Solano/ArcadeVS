@@ -3,6 +3,8 @@ import LayoutAuth from '../componentes/layout-auth.jsx';
 import BiosButton from '../componentes/crt/bios-button.jsx';
 import Separador from '../componentes/crt/separador.jsx';
 import CajasCodigo from '../componentes/crt/cajas-codigo.jsx';
+import MensajeError from '../componentes/crt/mensaje-error.jsx';
+import { verificar_codigo, reenviar_codigo } from '../servicios/servicio-autenticacion.js';
 
 const HERO_VERIFICACION = {
   hero_l1: 'VERIFICA',
@@ -38,6 +40,8 @@ function maskear_correo(correo) {
 export default function PaginaVerificacion({ correo, ir_a_login, ir_a_registro }) {
   const [timer_verificacion, set_timer] = useState(900);
   const [digitos, set_digitos] = useState(['', '', '', '', '', '']);
+  const [error, set_error] = useState('');
+  const [cargando, set_cargando] = useState(false);
   const iv = useRef(null);
 
   useEffect(() => {
@@ -48,15 +52,42 @@ export default function PaginaVerificacion({ correo, ir_a_login, ir_a_registro }
   const codigo_expirado = timer_verificacion === 0;
   const codigo_completo = digitos.every((d) => d !== '');
 
-  /** Verifica el codigo y, si esta completo, navega al login. */
-  const manejar_verificacion = () => {
-    if (codigo_completo) ir_a_login();
+  const actualizar_digitos = (nuevos) => {
+    set_digitos(nuevos);
+    if (error) set_error('');
   };
 
-  /** Reinicia el temporizador al reenviar el codigo. */
-  const manejar_reenvio = () => {
-    set_timer(900);
-    set_digitos(['', '', '', '', '', '']);
+  /** Verifica el codigo contra el backend y, si es correcto, navega al login. */
+  const manejar_verificacion = async () => {
+    if (!codigo_completo) {
+      set_error('INGRESA LOS 6 DIGITOS DEL CODIGO.');
+      return;
+    }
+    set_cargando(true);
+    set_error('');
+    try {
+      await verificar_codigo(correo, digitos.join(''));
+      ir_a_login();
+    } catch (e) {
+      set_error((e.message || 'NO SE PUDO VERIFICAR EL CODIGO.').toUpperCase());
+    } finally {
+      set_cargando(false);
+    }
+  };
+
+  /** Reenvia un codigo nuevo y reinicia el temporizador. */
+  const manejar_reenvio = async () => {
+    set_cargando(true);
+    set_error('');
+    try {
+      await reenviar_codigo(correo);
+      set_timer(900);
+      set_digitos(['', '', '', '', '', '']);
+    } catch (e) {
+      set_error((e.message || 'NO SE PUDO REENVIAR EL CODIGO.').toUpperCase());
+    } finally {
+      set_cargando(false);
+    }
   };
 
   return (
@@ -108,12 +139,14 @@ export default function PaginaVerificacion({ correo, ir_a_login, ir_a_registro }
       <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '9px', letterSpacing: '0.12em', color: 'var(--pink-dim)', marginBottom: '14px' }}>
         INGRESA TU CODIGO:
       </div>
-      <CajasCodigo digitos={digitos} onChange={set_digitos} />
+      <CajasCodigo digitos={digitos} onChange={actualizar_digitos} />
+
+      <MensajeError texto={error} />
 
       <Separador style={{ margin: '18px 0 14px' }} />
-      <BiosButton texto="VERIFICAR CODIGO" seleccionado onClick={manejar_verificacion} />
+      <BiosButton texto={cargando ? 'VERIFICANDO...' : 'VERIFICAR CODIGO'} seleccionado disabled={cargando} onClick={manejar_verificacion} />
       <div style={{ height: '12px' }} />
-      <BiosButton texto="REENVIAR CODIGO" disabled={!codigo_expirado} onClick={manejar_reenvio} />
+      <BiosButton texto="REENVIAR CODIGO" disabled={cargando || !codigo_expirado} onClick={manejar_reenvio} />
       <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '8px', letterSpacing: '0.12em', color: 'var(--pink-faint)', marginTop: '10px' }}>
         DISPONIBLE SI EL TIEMPO EXPIRA.
       </div>

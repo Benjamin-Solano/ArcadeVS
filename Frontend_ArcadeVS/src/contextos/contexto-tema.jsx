@@ -1,7 +1,7 @@
 import { createContext, useEffect, useState } from 'react';
 
 /** Temas CRT disponibles. Sakura no lleva atributo data-theme. */
-const TEMAS = ['sakura', 'amber', 'blue'];
+const TEMAS = ['sakura', 'amber', 'blue', 'grey'];
 
 export const ContextoTema = createContext({ tema: 'sakura', ciclar_tema: () => {}, cambiar_tema: () => {} });
 
@@ -21,7 +21,7 @@ export function ProveedorTema({ children }) {
     }
   }, [tema]);
 
-  /** Cambia al siguiente tema en el ciclo sakura -> amber -> blue -> sakura. */
+  /** Cambia al siguiente tema en el ciclo sakura -> amber -> blue -> grey -> sakura. */
   const ciclar_tema = () => {
     set_tema((actual) => TEMAS[(TEMAS.indexOf(actual) + 1) % TEMAS.length]);
   };

@@ -4,6 +4,8 @@ import InputField from '../componentes/crt/input-field.jsx';
 import BiosButton from '../componentes/crt/bios-button.jsx';
 import Separador from '../componentes/crt/separador.jsx';
 import LeyendaIconos from '../componentes/crt/leyenda-iconos.jsx';
+import MensajeError from '../componentes/crt/mensaje-error.jsx';
+import { registrar_usuario } from '../servicios/servicio-autenticacion.js';
 
 const HERO_REGISTRO = {
   hero_l1: 'EMPIEZA',
@@ -29,15 +31,44 @@ export default function PaginaRegistro({ ir_a_verificacion, ir_a_login }) {
     confirmar: '',
   });
 
-  const actualizar = (campo) => (valor) => set_datos((d) => ({ ...d, [campo]: valor }));
+  const [error, set_error] = useState('');
+  const [cargando, set_cargando] = useState(false);
 
-  /** Valida el formulario y avanza a la pantalla de verificacion. */
-  const manejar_registro = () => {
+  const actualizar = (campo) => (valor) => {
+    set_datos((d) => ({ ...d, [campo]: valor }));
+    if (error) set_error('');
+  };
+
+  /** Valida el formulario, crea la cuenta en el backend y avanza a verificacion. */
+  const manejar_registro = async () => {
     // Validacion minima de cliente; la validacion real ocurre en el backend.
-    if (datos.contrasena.length < 8) return;
-    if (datos.contrasena !== datos.confirmar) return;
-    if (!datos.correo.includes('@')) return;
-    ir_a_verificacion(datos.correo);
+    if (!datos.nombre.trim() || !datos.apellido.trim()) {
+      set_error('EL NOMBRE Y EL APELLIDO SON OBLIGATORIOS.');
+      return;
+    }
+    if (!datos.correo.includes('@')) {
+      set_error('EL CORREO NO TIENE UN FORMATO VALIDO.');
+      return;
+    }
+    if (datos.contrasena.length < 8) {
+      set_error('LA CONTRASENA DEBE TENER AL MENOS 8 CARACTERES.');
+      return;
+    }
+    if (datos.contrasena !== datos.confirmar) {
+      set_error('LAS CONTRASENAS NO COINCIDEN.');
+      return;
+    }
+
+    set_cargando(true);
+    set_error('');
+    try {
+      await registrar_usuario(datos);
+      ir_a_verificacion(datos.correo);
+    } catch (e) {
+      set_error((e.message || 'NO SE PUDO COMPLETAR EL REGISTRO.').toUpperCase());
+    } finally {
+      set_cargando(false);
+    }
   };
 
   return (
@@ -67,8 +98,10 @@ export default function PaginaRegistro({ ir_a_verificacion, ir_a_login }) {
         MINIMO 8 CARACTERES.
       </div>
 
+      <MensajeError texto={error} />
+
       <Separador style={{ margin: '14px 0' }} />
-      <BiosButton texto="REGISTRARSE" seleccionado onClick={manejar_registro} />
+      <BiosButton texto={cargando ? 'REGISTRANDO...' : 'REGISTRARSE'} seleccionado disabled={cargando} onClick={manejar_registro} />
       <Separador style={{ margin: '14px 0' }} />
 
       <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '9px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
