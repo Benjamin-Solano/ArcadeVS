@@ -7,9 +7,13 @@
 
 import '../src/configuracion/cargar-entorno.js';
 
+// Evita enviar correos reales durante las pruebas (modo desarrollo del correo).
+process.env.CORREO_HABILITADO = 'false';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construir_servidor } from '../src/construir-servidor.js';
 import { consultar, cerrar_pool } from '../src/configuracion/configuracion-db.js';
+import { firmar_token } from '../src/configuracion/configuracion-autenticacion.js';
 
 let servidor;
 const ids_torneos = [];
@@ -34,8 +38,11 @@ async function registrar_usuario() {
       contrasena: 'contrasenaSegura123',
     },
   });
-  const { usuario, token } = respuesta.json();
+  const { usuario } = respuesta.json();
   ids_usuarios.push(usuario.id_usuario);
+  // El registro ya no devuelve token (login requiere verificacion); las pruebas
+  // de torneo solo necesitan un token valido, se firma directamente.
+  const token = firmar_token(usuario.id_usuario);
   return { token, id_usuario: usuario.id_usuario };
 }
 

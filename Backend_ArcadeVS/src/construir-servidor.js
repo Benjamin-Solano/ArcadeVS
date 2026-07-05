@@ -8,6 +8,7 @@
  */
 
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 
 import { verificar_conexion } from './configuracion/configuracion-db.js';
 import { ErrorServicio } from './servicios/error-servicio.js';
@@ -26,6 +27,14 @@ import { registrar_rutas_torneo } from './rutas/rutas-torneo.js';
  */
 export function construir_servidor(opciones = {}) {
   const servidor = Fastify(opciones);
+
+  // CORS: permite que el frontend (otro origen en desarrollo) consuma la API
+  // REST desde el navegador. El origen se toma de CORS_ORIGEN (la URL del
+  // frontend en produccion); por defecto '*' en desarrollo local.
+  servidor.register(cors, {
+    origin: process.env.CORS_ORIGEN ?? '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  });
 
   // Bus de eventos para las rutas REST. Por defecto null (sin socket, p. ej. en
   // pruebas de inject); index.js lo asigna con la instancia real de Socket.io.

@@ -18,7 +18,8 @@ import { consultar } from '../configuracion/configuracion-db.js';
  */
 const CAMPOS_PUBLICOS = `
   id_usuario, nombre, apellido, correo, codigo_amigo,
-  nacionalidad, fecha_nacimiento, avatar_url, rol, fecha_registro, ultima_conexion
+  nacionalidad, fecha_nacimiento, avatar_url, rol, verificado,
+  fecha_registro, ultima_conexion
 `;
 
 /**
@@ -103,13 +104,42 @@ export async function obtener_usuario_por_codigo_amigo(codigo_amigo) {
  * de autenticacion.
  *
  * @param {string} correo - Correo del usuario.
- * @returns {Promise<{id_usuario: string, contrasena_hash: string}|null>}
+ * @returns {Promise<{id_usuario: string, contrasena_hash: string, verificado: boolean}|null>}
  *          Credenciales o null si no existe el correo.
  */
 export async function obtener_credenciales_por_correo(correo) {
   const filas = await consultar(
-    `SELECT id_usuario, contrasena_hash FROM usuarios WHERE correo = $1`,
+    `SELECT id_usuario, contrasena_hash, verificado FROM usuarios WHERE correo = $1`,
     [correo],
+  );
+  return filas[0] ?? null;
+}
+
+/**
+ * Busca un usuario por su correo (campos públicos). Se usa en el flujo de
+ * verificación, que identifica al usuario por correo antes de tener sesión.
+ *
+ * @param {string} correo - Correo del usuario.
+ * @returns {Promise<object|null>} El usuario (campos públicos) o null si no existe.
+ */
+export async function obtener_usuario_por_correo(correo) {
+  const filas = await consultar(
+    `SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE correo = $1`,
+    [correo],
+  );
+  return filas[0] ?? null;
+}
+
+/**
+ * Marca un usuario como verificado (tras confirmar el código de su correo).
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @returns {Promise<object|null>} El usuario actualizado o null si no existe.
+ */
+export async function marcar_verificado(id_usuario) {
+  const filas = await consultar(
+    `UPDATE usuarios SET verificado = TRUE WHERE id_usuario = $1 RETURNING ${CAMPOS_PUBLICOS}`,
+    [id_usuario],
   );
   return filas[0] ?? null;
 }

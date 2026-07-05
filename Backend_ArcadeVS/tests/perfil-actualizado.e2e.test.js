@@ -8,11 +8,15 @@
 
 import '../src/configuracion/cargar-entorno.js';
 
+// Evita enviar correos reales durante las pruebas (modo desarrollo del correo).
+process.env.CORREO_HABILITADO = 'false';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as crear_cliente } from 'socket.io-client';
 import { construir_servidor } from '../src/construir-servidor.js';
 import { crear_socket } from '../src/configuracion/configuracion-socket.js';
 import { consultar, cerrar_pool } from '../src/configuracion/configuracion-db.js';
+import { firmar_token } from '../src/configuracion/configuracion-autenticacion.js';
 
 let servidor;
 let io;
@@ -65,8 +69,10 @@ describe('usuario:perfil_actualizado (REST → bus)', () => {
       url: '/auth/registro',
       payload: datos_registro_unicos(),
     });
-    const { usuario, token } = reg.json();
+    const { usuario } = reg.json();
     ids_creados.push(usuario.id_usuario);
+    // El registro ya no devuelve token; se firma directamente para el socket.
+    const token = firmar_token(usuario.id_usuario);
 
     const cliente = await conectar_cliente(token);
     try {

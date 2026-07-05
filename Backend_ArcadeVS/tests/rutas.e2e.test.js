@@ -7,6 +7,9 @@
 
 import '../src/configuracion/cargar-entorno.js';
 
+// Evita enviar correos reales durante las pruebas (modo desarrollo del correo).
+process.env.CORREO_HABILITADO = 'false';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construir_servidor } from '../src/construir-servidor.js';
 import { consultar, cerrar_pool } from '../src/configuracion/configuracion-db.js';
@@ -30,6 +33,30 @@ beforeAll(async () => {
   await servidor.ready();
 });
 
+/**
+ * Registra un usuario, verifica su correo con el código expuesto en desarrollo
+ * e inicia sesión, devolviendo su id y un token válido. Usado por las pruebas de
+ * rutas protegidas, que ahora requieren una cuenta verificada para autenticarse.
+ */
+async function registrar_verificado_y_login() {
+  const datos = datos_registro_unicos();
+  const reg = await servidor.inject({ method: 'POST', url: '/auth/registro', payload: datos });
+  const { usuario, codigo_dev } = reg.json();
+  ids_creados.push(usuario.id_usuario);
+
+  await servidor.inject({
+    method: 'POST',
+    url: '/auth/verificar',
+    payload: { correo: datos.correo, codigo: codigo_dev },
+  });
+  const login = await servidor.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { correo: datos.correo, contrasena: datos.contrasena },
+  });
+  return { id_usuario: usuario.id_usuario, token: login.json().token };
+}
+
 afterAll(async () => {
   for (const id of ids_creados) {
     await consultar('DELETE FROM usuarios WHERE id_usuario = $1', [id]);
@@ -38,8 +65,8 @@ afterAll(async () => {
   await cerrar_pool();
 });
 
-describe('POST /auth/registro y /auth/login', () => {
-  it('registra un usuario y devuelve usuario + token', async () => {
+describe('POST /auth/registro, /auth/verificar y /auth/login', () => {
+  it('registra un usuario sin token y como pendiente de verificacion', async () => {
     const datos = datos_registro_unicos();
     const respuesta = await servidor.inject({
       method: 'POST',
@@ -50,7 +77,11 @@ describe('POST /auth/registro y /auth/login', () => {
     const cuerpo = respuesta.json();
     expect(cuerpo.usuario.id_usuario).toBeTruthy();
     expect(cuerpo.usuario).not.toHaveProperty('contrasena_hash');
-    expect(typeof cuerpo.token).toBe('string');
+    expect(cuerpo.usuario.verificado).toBe(false);
+    expect(cuerpo).not.toHaveProperty('token');
+    expect(cuerpo.pendiente_verificacion).toBe(true);
+    // En entorno de desarrollo la ruta expone el codigo para poder probar.
+    expect(typeof cuerpo.codigo_dev).toBe('string');
     ids_creados.push(cuerpo.usuario.id_usuario);
   });
 
@@ -64,7 +95,34 @@ describe('POST /auth/registro y /auth/login', () => {
     expect(respuesta.json().codigo).toBe('DATOS_INVALIDOS');
   });
 
-  it('inicia sesion con credenciales correctas', async () => {
+  it('verifica el codigo y luego inicia sesion con credenciales correctas', async () => {
+    const datos = datos_registro_unicos();
+    const reg = await servidor.inject({
+      method: 'POST',
+      url: '/auth/registro',
+      payload: datos,
+    });
+    const { usuario, codigo_dev } = reg.json();
+    ids_creados.push(usuario.id_usuario);
+
+    const verif = await servidor.inject({
+      method: 'POST',
+      url: '/auth/verificar',
+      payload: { correo: datos.correo, codigo: codigo_dev },
+    });
+    expect(verif.statusCode).toBe(200);
+    expect(verif.json().usuario.verificado).toBe(true);
+
+    const respuesta = await servidor.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { correo: datos.correo, contrasena: datos.contrasena },
+    });
+    expect(respuesta.statusCode).toBe(200);
+    expect(typeof respuesta.json().token).toBe('string');
+  });
+
+  it('rechaza el login de una cuenta no verificada (403)', async () => {
     const datos = datos_registro_unicos();
     const reg = await servidor.inject({
       method: 'POST',
@@ -78,8 +136,26 @@ describe('POST /auth/registro y /auth/login', () => {
       url: '/auth/login',
       payload: { correo: datos.correo, contrasena: datos.contrasena },
     });
-    expect(respuesta.statusCode).toBe(200);
-    expect(typeof respuesta.json().token).toBe('string');
+    expect(respuesta.statusCode).toBe(403);
+    expect(respuesta.json().codigo).toBe('CUENTA_NO_VERIFICADA');
+  });
+
+  it('rechaza un codigo de verificacion incorrecto (400)', async () => {
+    const datos = datos_registro_unicos();
+    const reg = await servidor.inject({
+      method: 'POST',
+      url: '/auth/registro',
+      payload: datos,
+    });
+    ids_creados.push(reg.json().usuario.id_usuario);
+
+    const respuesta = await servidor.inject({
+      method: 'POST',
+      url: '/auth/verificar',
+      payload: { correo: datos.correo, codigo: '000000' },
+    });
+    expect(respuesta.statusCode).toBe(400);
+    expect(respuesta.json().codigo).toBe('CODIGO_INVALIDO');
   });
 
   it('rechaza el login con credenciales invalidas (401)', async () => {
@@ -104,14 +180,7 @@ describe('rutas protegidas de usuario', () => {
   });
 
   it('devuelve el perfil propio con un token valido', async () => {
-    const datos = datos_registro_unicos();
-    const reg = await servidor.inject({
-      method: 'POST',
-      url: '/auth/registro',
-      payload: datos,
-    });
-    const { usuario, token } = reg.json();
-    ids_creados.push(usuario.id_usuario);
+    const { id_usuario, token } = await registrar_verificado_y_login();
 
     const respuesta = await servidor.inject({
       method: 'GET',
@@ -119,7 +188,7 @@ describe('rutas protegidas de usuario', () => {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(respuesta.statusCode).toBe(200);
-    expect(respuesta.json().usuario.id_usuario).toBe(usuario.id_usuario);
+    expect(respuesta.json().usuario.id_usuario).toBe(id_usuario);
   });
 });
 
@@ -132,17 +201,8 @@ describe('rutas publicas de juego', () => {
 });
 
 describe('PUT /usuarios/:id/rol (autorizacion de admin)', () => {
-  /** Registra un usuario via REST y devuelve su token e id. */
-  async function registrar() {
-    const reg = await servidor.inject({
-      method: 'POST',
-      url: '/auth/registro',
-      payload: datos_registro_unicos(),
-    });
-    const { usuario, token } = reg.json();
-    ids_creados.push(usuario.id_usuario);
-    return { id_usuario: usuario.id_usuario, token };
-  }
+  /** Registra un usuario verificado y con sesion (token) via REST. */
+  const registrar = registrar_verificado_y_login;
 
   it('un no admin no puede cambiar roles (403)', async () => {
     const solicitante = await registrar();
