@@ -137,6 +137,30 @@ export async function obtener_jugadores_de_partida(id_partida, cliente = null) {
 }
 
 /**
+ * Agrega los resultados de las partidas de un usuario (solo filas humanas).
+ * Cuenta victorias, derrotas, empates y el total de partidas finalizadas
+ * (resultado no nulo). Sirve para el resumen de estadisticas del perfil.
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @returns {Promise<{partidas: number, victorias: number, derrotas: number, empates: number}>}
+ *          Conteos de partidas por resultado.
+ */
+export async function obtener_estadisticas_partidas(id_usuario) {
+  const filas = await consultar_con(
+    null,
+    `SELECT
+        COUNT(*) FILTER (WHERE resultado = 'victoria')::int AS victorias,
+        COUNT(*) FILTER (WHERE resultado = 'derrota')::int  AS derrotas,
+        COUNT(*) FILTER (WHERE resultado = 'empate')::int   AS empates,
+        COUNT(*) FILTER (WHERE resultado IS NOT NULL)::int  AS partidas
+       FROM partidas_jugadores
+      WHERE id_usuario = $1 AND es_bot = FALSE`,
+    [id_usuario],
+  );
+  return filas[0] ?? { partidas: 0, victorias: 0, derrotas: 0, empates: 0 };
+}
+
+/**
  * Obtiene el historial de partidas de un usuario, con datos del juego y su
  * resultado, ordenado de la mas reciente a la mas antigua.
  *

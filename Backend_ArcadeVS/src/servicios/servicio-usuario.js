@@ -19,6 +19,9 @@ import {
   actualizar_rol as actualizar_rol_bd,
   actualizar_ultima_conexion,
 } from '../repositorios/repositorio-usuario.js';
+import { obtener_estadisticas_partidas } from '../repositorios/repositorio-partida.js';
+import { contar_torneos_de_usuario } from '../repositorios/repositorio-torneo.js';
+import { contar_amigos } from '../repositorios/repositorio-amistad.js';
 import { ErrorServicio } from './error-servicio.js';
 import { exigir_admin } from './autorizacion.js';
 import { validar_datos_registro, validar_correo } from './validaciones-usuario.js';
@@ -151,6 +154,32 @@ export async function obtener_perfil(id_usuario) {
     throw new ErrorServicio('USUARIO_NO_ENCONTRADO', 'El usuario no existe.', 404);
   }
   return usuario;
+}
+
+/**
+ * Reune las estadisticas de juego del usuario para el perfil: partidas jugadas,
+ * victorias, derrotas, empates, torneos jugados y numero de amigos. Combina los
+ * agregados de tres repositorios (partidas, torneos, amistades).
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @returns {Promise<{partidas: number, victorias: number, derrotas: number,
+ *          empates: number, torneos: number, amigos: number}>} Resumen de estadisticas.
+ */
+export async function obtener_estadisticas(id_usuario) {
+  const [partidas, torneos, amigos] = await Promise.all([
+    obtener_estadisticas_partidas(id_usuario),
+    contar_torneos_de_usuario(id_usuario),
+    contar_amigos(id_usuario),
+  ]);
+
+  return {
+    partidas: partidas.partidas,
+    victorias: partidas.victorias,
+    derrotas: partidas.derrotas,
+    empates: partidas.empates,
+    torneos,
+    amigos,
+  };
 }
 
 /**

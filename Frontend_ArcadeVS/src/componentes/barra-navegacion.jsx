@@ -162,12 +162,24 @@ export default function BarraNavegacion({ usuario, activo = 'inicio', al_navegar
 
         {/* Segmento sesion */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '0 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => al_navegar('perfil')}
+            title="VER PERFIL"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: activo === 'perfil' ? 'rgba(var(--glow-neon),.06)' : 'transparent',
+              border: 'none',
+              padding: '6px 4px',
+            }}
+          >
             <GlifoPixel name="pawn" size={13} color="var(--celadon)" glow="var(--glow-cel)" />
-            <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '10px', letterSpacing: '0.10em', color: 'var(--petal-white)', textShadow: '0 0 6px rgba(var(--glow-pink),.5)' }}>
+            <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '10px', letterSpacing: '0.10em', color: activo === 'perfil' ? 'var(--neon-pink)' : 'var(--petal-white)', textShadow: '0 0 6px rgba(var(--glow-pink),.5)' }}>
               {nombre}
             </div>
-          </div>
+          </button>
           <BadgeTema />
           <button
             type="button"
