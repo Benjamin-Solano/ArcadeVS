@@ -3,6 +3,7 @@ import { ProveedorTema } from './contextos/contexto-tema.jsx';
 import PaginaRegistro from './paginas/pagina-registro.jsx';
 import PaginaVerificacion from './paginas/pagina-verificacion.jsx';
 import PaginaLogin from './paginas/pagina-login.jsx';
+import PaginaInicio from './paginas/pagina-inicio.jsx';
 import { cerrar_sesion } from './servicios/servicio-autenticacion.js';
 
 /**
@@ -45,45 +46,7 @@ export default function App() {
       {pantalla === 'login' && (
         <PaginaLogin ir_a_registro={() => set_pantalla('registro')} al_iniciar_sesion={al_iniciar_sesion} />
       )}
-      {pantalla === 'sesion' && <PantallaSesion usuario={usuario} al_cerrar_sesion={al_cerrar_sesion} />}
+      {pantalla === 'sesion' && <PaginaInicio usuario={usuario} al_cerrar_sesion={al_cerrar_sesion} />}
     </ProveedorTema>
-  );
-}
-
-/**
- * PantallaSesion — confirmacion minima de sesion iniciada. Placeholder hasta
- * que exista el lobby; verifica de extremo a extremo que el login contra el
- * backend funciona mostrando el usuario autenticado.
- */
-function PantallaSesion({ usuario, al_cerrar_sesion }) {
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '18px',
-        background: 'var(--bg-screen)',
-        fontFamily: "'Silkscreen', monospace",
-        textAlign: 'center',
-        padding: '24px',
-      }}
-    >
-      <div style={{ fontSize: '18px', letterSpacing: '0.10em', color: 'var(--petal-white)', textShadow: '0 0 10px rgba(var(--glow-pink),.55)' }}>
-        SESION INICIADA
-      </div>
-      <div style={{ fontSize: '10px', letterSpacing: '0.10em', color: 'var(--celadon)', textShadow: '0 0 6px rgba(var(--glow-cel),.5)' }}>
-        BIENVENIDO, {(usuario?.nombre || 'JUGADOR').toUpperCase()}
-      </div>
-      <span
-        onClick={al_cerrar_sesion}
-        style={{ position: 'relative', cursor: 'pointer', fontSize: '9px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}
-      >
-        CERRAR SESION
-        <span style={{ position: 'absolute', left: 0, right: 0, bottom: '-3px', height: '1px', background: 'rgba(var(--glow-neon),.7)' }} />
-      </span>
-    </div>
   );
 }

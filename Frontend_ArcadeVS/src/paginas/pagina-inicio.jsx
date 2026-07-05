@@ -1,0 +1,45 @@
+import { useState } from 'react';
+import OverlaysCrt from '../componentes/crt/overlays-crt.jsx';
+import BarraNavegacion from '../componentes/barra-navegacion.jsx';
+
+/**
+ * PaginaInicio — pantalla principal tras iniciar sesion. Por ahora solo monta la
+ * barra de navegacion superior sobre el fondo CRT; el contenido del body queda
+ * como marcador de posicion hasta desarrollar las secciones.
+ *
+ * @param {object} props
+ * @param {object} props.usuario - Usuario en sesion.
+ * @param {function} props.al_cerrar_sesion - Cierra la sesion.
+ */
+export default function PaginaInicio({ usuario, al_cerrar_sesion }) {
+  const [seccion_activa, set_seccion_activa] = useState('inicio');
+
+  return (
+    <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--bg-screen)', animation: 'flick 6s ease-in-out infinite' }}>
+      <OverlaysCrt />
+      <BarraNavegacion
+        usuario={usuario}
+        activo={seccion_activa}
+        al_navegar={set_seccion_activa}
+        al_cerrar_sesion={al_cerrar_sesion}
+      />
+
+      {/* Marcador de posicion del contenido — se desarrollara mas adelante */}
+      <main
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 84px)',
+          fontFamily: "'Silkscreen', monospace",
+          fontSize: '10px',
+          letterSpacing: '0.14em',
+          color: 'var(--pink-faint)',
+        }}
+      >
+        SECCION: {seccion_activa.toUpperCase()}
+      </main>
+    </div>
+  );
+}
