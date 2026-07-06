@@ -17,7 +17,9 @@
 
 import {
   obtener_perfil,
+  obtener_estadisticas,
   actualizar_perfil,
+  actualizar_nombre,
   actualizar_rol,
 } from '../servicios/servicio-usuario.js';
 import { obtener_historial } from '../servicios/servicio-historial.js';
@@ -52,6 +54,24 @@ export async function registrar_rutas_usuario(servidor) {
       emitir_perfil_actualizado(peticion.server.io, usuario.id_usuario, usuario);
     }
     return { usuario };
+  });
+
+  /** Actualiza el nombre visible (alias) del usuario autenticado. */
+  servidor.put('/nombre', async (peticion) => {
+    const usuario = await actualizar_nombre(
+      peticion.usuario.id_usuario,
+      peticion.body?.nombre,
+    );
+    if (peticion.server.io) {
+      emitir_perfil_actualizado(peticion.server.io, usuario.id_usuario, usuario);
+    }
+    return { usuario };
+  });
+
+  /** Devuelve el resumen de estadisticas de juego del usuario autenticado. */
+  servidor.get('/estadisticas', async (peticion) => {
+    const estadisticas = await obtener_estadisticas(peticion.usuario.id_usuario);
+    return { estadisticas };
   });
 
   /** Devuelve el historial de partidas del usuario autenticado. */

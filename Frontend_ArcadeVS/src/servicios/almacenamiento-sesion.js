@@ -39,6 +39,16 @@ export function guardar_sesion(token, usuario) {
   localStorage.setItem(CLAVE_USUARIO, JSON.stringify(usuario));
 }
 
+/**
+ * Reemplaza el usuario guardado conservando el token (p. ej. tras actualizar el
+ * perfil o el avatar). No toca el token de sesion.
+ *
+ * @param {object} usuario - Usuario actualizado (campos publicos).
+ */
+export function actualizar_usuario(usuario) {
+  localStorage.setItem(CLAVE_USUARIO, JSON.stringify(usuario));
+}
+
 /** Elimina la sesion del navegador (cierre de sesion). */
 export function eliminar_sesion() {
   localStorage.removeItem(CLAVE_TOKEN);

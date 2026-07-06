@@ -161,6 +161,20 @@ export async function obtener_participantes(id_torneo) {
 }
 
 /**
+ * Cuenta los torneos en los que un usuario esta o estuvo inscrito.
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @returns {Promise<number>} Numero de torneos en los que participa el usuario.
+ */
+export async function contar_torneos_de_usuario(id_usuario) {
+  const filas = await consultar(
+    `SELECT COUNT(*)::int AS total FROM torneos_participantes WHERE id_usuario = $1`,
+    [id_usuario],
+  );
+  return filas[0].total;
+}
+
+/**
  * Elimina la inscripcion de un usuario en un torneo.
  *
  * @param {string} id_torneo - UUID del torneo.

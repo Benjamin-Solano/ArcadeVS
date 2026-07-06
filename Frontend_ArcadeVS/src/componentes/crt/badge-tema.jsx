@@ -3,7 +3,7 @@ import { ContextoTema } from '../../contextos/contexto-tema.jsx';
 
 /**
  * BadgeTema — caja 100x24px en la esquina inferior-izquierda del panel hero.
- * Muestra el tema activo y al pulsar cicla entre SAKURA, AMBER y BLUE.
+ * Muestra el tema activo y al pulsar cicla entre SAKURA, AMBER, BLUE, GREY, VERDE, ROJO y PURPURA.
  */
 export default function BadgeTema() {
   const { tema, ciclar_tema } = useContext(ContextoTema);

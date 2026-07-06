@@ -19,6 +19,15 @@ import {
   actualizar_rol as actualizar_rol_bd,
   actualizar_ultima_conexion,
 } from '../repositorios/repositorio-usuario.js';
+import {
+  obtener_estadisticas_partidas,
+  obtener_tags_jugados,
+} from '../repositorios/repositorio-partida.js';
+import { contar_torneos_de_usuario } from '../repositorios/repositorio-torneo.js';
+import { contar_amigos } from '../repositorios/repositorio-amistad.js';
+import { obtener_catalogo_tags } from '../repositorios/repositorio-juego.js';
+import { actualizar_nombre as actualizar_nombre_bd } from '../repositorios/repositorio-usuario.js';
+import { validar_nombre } from './validaciones-usuario.js';
 import { ErrorServicio } from './error-servicio.js';
 import { exigir_admin } from './autorizacion.js';
 import { validar_datos_registro, validar_correo } from './validaciones-usuario.js';
@@ -151,6 +160,69 @@ export async function obtener_perfil(id_usuario) {
     throw new ErrorServicio('USUARIO_NO_ENCONTRADO', 'El usuario no existe.', 404);
   }
   return usuario;
+}
+
+/**
+ * Reune las estadisticas de juego del usuario para el perfil: partidas jugadas,
+ * victorias, derrotas, empates, torneos jugados y numero de amigos. Combina los
+ * agregados de tres repositorios (partidas, torneos, amistades).
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @returns {Promise<{partidas: number, victorias: number, derrotas: number,
+ *          empates: number, torneos: number, amigos: number}>} Resumen de estadisticas.
+ */
+export async function obtener_estadisticas(id_usuario) {
+  const [partidas, torneos, amigos, tags_jugados] = await Promise.all([
+    obtener_estadisticas_partidas(id_usuario),
+    contar_torneos_de_usuario(id_usuario),
+    contar_amigos(id_usuario),
+    obtener_tags_jugados(id_usuario),
+  ]);
+
+  // Si el usuario aun no ha jugado, se usan los tags del catalogo como ejes del
+  // radar (en cero) para que el grafico muestre su estructura.
+  let tags = tags_jugados;
+  if (tags.length === 0) {
+    const catalogo = await obtener_catalogo_tags();
+    tags = catalogo.map((t) => ({ tag: t.nombre, valor: 0 }));
+  }
+
+  return {
+    partidas: partidas.partidas,
+    victorias: partidas.victorias,
+    derrotas: partidas.derrotas,
+    empates: partidas.empates,
+    torneos,
+    amigos,
+    tags,
+  };
+}
+
+/**
+ * Cambia el nombre visible (alias) del usuario. Valida el formato y verifica que
+ * el nombre no este en uso por otro usuario (es UNIQUE en la BD). Si el nombre no
+ * cambia, devuelve el usuario tal cual.
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @param {string} nombre - Nuevo nombre visible.
+ * @returns {Promise<object>} El usuario actualizado (campos publicos).
+ */
+export async function actualizar_nombre(id_usuario, nombre) {
+  const limpio = validar_nombre(nombre);
+
+  const actual = await obtener_usuario_por_id(id_usuario);
+  if (!actual) {
+    throw new ErrorServicio('USUARIO_NO_ENCONTRADO', 'El usuario no existe.', 404);
+  }
+  if (actual.nombre === limpio) {
+    return actual;
+  }
+  if (await existe_nombre(limpio)) {
+    throw new ErrorServicio('NOMBRE_EN_USO', 'El nombre ya esta en uso.', 409);
+  }
+
+  const actualizado = await actualizar_nombre_bd(id_usuario, limpio);
+  return actualizado;
 }
 
 /**

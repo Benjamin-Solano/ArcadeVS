@@ -123,6 +123,23 @@ export async function obtener_amigos(id_usuario) {
 }
 
 /**
+ * Cuenta los amigos confirmados (estado 'aceptado') de un usuario.
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @returns {Promise<number>} Numero de amigos confirmados.
+ */
+export async function contar_amigos(id_usuario) {
+  const filas = await consultar(
+    `SELECT COUNT(*)::int AS total
+       FROM solicitudes_amistad
+      WHERE (id_solicitante = $1 OR id_receptor = $1)
+        AND estado = 'aceptado'`,
+    [id_usuario],
+  );
+  return filas[0].total;
+}
+
+/**
  * Lista las solicitudes pendientes en las que participa un usuario.
  *
  * @param {string} id_usuario - UUID del usuario.
