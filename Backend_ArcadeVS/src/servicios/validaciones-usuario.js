@@ -28,6 +28,26 @@ function validar_texto_requerido(valor, etiqueta) {
   return valor.trim();
 }
 
+/** Longitud maxima del nombre visible (coincide con VARCHAR(50) en la BD). */
+export const LONGITUD_MAXIMA_NOMBRE = 50;
+
+/**
+ * Valida el nombre visible (alias): texto no vacio y de a lo sumo 50 caracteres.
+ *
+ * @param {string} nombre - Nombre a validar.
+ * @returns {string} El nombre recortado.
+ */
+export function validar_nombre(nombre) {
+  const limpio = validar_texto_requerido(nombre, 'nombre');
+  if (limpio.length > LONGITUD_MAXIMA_NOMBRE) {
+    throw new ErrorServicio(
+      'DATOS_INVALIDOS',
+      `El nombre no puede superar los ${LONGITUD_MAXIMA_NOMBRE} caracteres.`,
+    );
+  }
+  return limpio;
+}
+
 /**
  * Valida el formato de un correo electronico.
  *

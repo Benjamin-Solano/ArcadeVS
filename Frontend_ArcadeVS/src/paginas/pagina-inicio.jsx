@@ -11,8 +11,9 @@ import PaginaPerfil from './pagina-perfil.jsx';
  * @param {object} props
  * @param {object} props.usuario - Usuario en sesion.
  * @param {function} props.al_cerrar_sesion - Cierra la sesion.
+ * @param {function} props.al_actualizar_usuario - Propaga cambios de perfil a la app.
  */
-export default function PaginaInicio({ usuario, al_cerrar_sesion }) {
+export default function PaginaInicio({ usuario, al_cerrar_sesion, al_actualizar_usuario }) {
   const [seccion_activa, set_seccion_activa] = useState('inicio');
 
   return (
@@ -27,7 +28,7 @@ export default function PaginaInicio({ usuario, al_cerrar_sesion }) {
 
       <main style={{ position: 'relative', minHeight: 'calc(100vh - 84px)', padding: '24px' }}>
         {seccion_activa === 'perfil' ? (
-          <PaginaPerfil usuario={usuario} />
+          <PaginaPerfil usuario={usuario} al_actualizar_usuario={al_actualizar_usuario} />
         ) : (
           // Marcador de posicion del resto de secciones — se desarrollara mas adelante
           <div

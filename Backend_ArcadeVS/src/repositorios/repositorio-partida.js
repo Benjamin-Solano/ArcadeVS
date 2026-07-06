@@ -161,6 +161,31 @@ export async function obtener_estadisticas_partidas(id_usuario) {
 }
 
 /**
+ * Agrega las partidas de un usuario por tag de juego: cuenta cuantas partidas
+ * finalizadas ha jugado en juegos que llevan cada tag. Sirve para el grafico de
+ * radar de afinidad del perfil (los tags que mas juega).
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @param {number} [limite] - Maximo de tags a devolver (por defecto 7).
+ * @returns {Promise<Array<{tag: string, valor: number}>>} Tags y conteo de partidas.
+ */
+export async function obtener_tags_jugados(id_usuario, limite = 7) {
+  return consultar_con(
+    null,
+    `SELECT t.nombre AS tag, COUNT(*)::int AS valor
+       FROM partidas_jugadores pj
+       JOIN partidas    p  ON p.id_partida = pj.id_partida
+       JOIN juegos_tags jt ON jt.id_juego  = p.id_juego
+       JOIN tags        t  ON t.id_tag      = jt.id_tag
+      WHERE pj.id_usuario = $1 AND pj.es_bot = FALSE AND pj.resultado IS NOT NULL
+      GROUP BY t.nombre
+      ORDER BY valor DESC, t.nombre ASC
+      LIMIT $2`,
+    [id_usuario, limite],
+  );
+}
+
+/**
  * Obtiene el historial de partidas de un usuario, con datos del juego y su
  * resultado, ordenado de la mas reciente a la mas antigua.
  *

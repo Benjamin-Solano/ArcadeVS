@@ -3,16 +3,30 @@
  * de ancho y separacion variables de forma determinista a partir de una semilla, para
  * que el patron sea estable entre renders. Es puramente ornamental (aria-hidden).
  *
+ * Las barras y sus separaciones usan `flex-grow` proporcional (no anchos fijos), de
+ * modo que el codigo abarca SIEMPRE todo el ancho disponible sin dejar huecos.
+ *
  * @param {object} props
  * @param {string} props.semilla - Cadena que siembra el patron (ej. el codigo del usuario).
  * @param {string} props.codigo - Texto mostrado bajo las barras.
  */
 export default function BarraCodigo({ semilla = 'ARCADEVS', codigo = 'ARCADEVS-0000-0000' }) {
   const base = (semilla || 'ARCADEVS').toUpperCase();
-  const barras = [];
-  for (let i = 0; i < 72; i += 1) {
+  const total = 84;
+  // Fila plana alternando barra y separacion; ambas usan flex-grow proporcional
+  // para llenar el 100% del ancho. La ultima barra no lleva separacion detras.
+  const hijos = [];
+  for (let i = 0; i < total; i += 1) {
     const c = base.charCodeAt(i % base.length) + i * 7;
-    barras.push({ ancho: 1 + (c % 4), separacion: 1 + (c % 3), opacidad: 0.35 + (c % 4) * 0.16 });
+    const ancho = 1 + (c % 4); // peso 1..4
+    const separacion = 1 + (c % 3); // peso 1..3
+    const opacidad = 0.35 + (c % 4) * 0.16;
+    hijos.push(
+      <div key={`b${i}`} style={{ flex: `${ancho} 1 0`, minWidth: 0, background: 'var(--petal-white)', opacity: opacidad, boxShadow: '0 0 2px rgba(var(--glow-pink),.5)' }} />,
+    );
+    if (i < total - 1) {
+      hijos.push(<div key={`s${i}`} style={{ flex: `${separacion} 1 0`, minWidth: 0 }} />);
+    }
   }
 
   return (
@@ -21,26 +35,13 @@ export default function BarraCodigo({ semilla = 'ARCADEVS', codigo = 'ARCADEVS-0
         style={{
           display: 'flex',
           alignItems: 'stretch',
+          width: '100%',
           height: '54px',
-          padding: '0 6px',
           background: 'var(--bg-screen)',
           border: '1px solid rgba(var(--glow-neon),.2)',
-          overflow: 'hidden',
         }}
       >
-        {barras.map((b, i) => (
-          <div
-            key={i}
-            style={{
-              flex: '0 0 auto',
-              width: `${b.ancho}px`,
-              marginRight: `${b.separacion}px`,
-              background: 'var(--petal-white)',
-              opacity: b.opacidad,
-              boxShadow: '0 0 2px rgba(var(--glow-pink),.5)',
-            }}
-          />
-        ))}
+        {hijos}
       </div>
       <div
         style={{

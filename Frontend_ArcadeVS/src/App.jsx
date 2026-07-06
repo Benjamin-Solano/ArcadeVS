@@ -31,6 +31,9 @@ export default function App() {
     set_pantalla('login');
   };
 
+  // Refleja en toda la app (navbar + perfil) los cambios de perfil ya persistidos.
+  const al_actualizar_usuario = (usuario_actualizado) => set_usuario(usuario_actualizado);
+
   return (
     <ProveedorTema>
       {pantalla === 'registro' && (
@@ -46,7 +49,9 @@ export default function App() {
       {pantalla === 'login' && (
         <PaginaLogin ir_a_registro={() => set_pantalla('registro')} al_iniciar_sesion={al_iniciar_sesion} />
       )}
-      {pantalla === 'sesion' && <PaginaInicio usuario={usuario} al_cerrar_sesion={al_cerrar_sesion} />}
+      {pantalla === 'sesion' && (
+        <PaginaInicio usuario={usuario} al_cerrar_sesion={al_cerrar_sesion} al_actualizar_usuario={al_actualizar_usuario} />
+      )}
     </ProveedorTema>
   );
 }

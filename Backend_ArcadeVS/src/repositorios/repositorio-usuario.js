@@ -199,6 +199,22 @@ export async function actualizar_perfil(id_usuario, datos) {
 }
 
 /**
+ * Actualiza el nombre visible (alias) de un usuario. La unicidad la garantiza el
+ * indice UNIQUE de la BD; la capa de servicio comprueba el conflicto antes.
+ *
+ * @param {string} id_usuario - UUID del usuario.
+ * @param {string} nombre - Nuevo nombre.
+ * @returns {Promise<object|null>} El usuario actualizado o null si no existe.
+ */
+export async function actualizar_nombre(id_usuario, nombre) {
+  const filas = await consultar(
+    `UPDATE usuarios SET nombre = $2 WHERE id_usuario = $1 RETURNING ${CAMPOS_PUBLICOS}`,
+    [id_usuario, nombre],
+  );
+  return filas[0] ?? null;
+}
+
+/**
  * Actualiza el rol de un usuario ('jugador' | 'admin').
  *
  * @param {string} id_usuario - UUID del usuario.

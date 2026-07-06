@@ -89,6 +89,57 @@
   --border: rgba(205, 214, 219, 0.26);
 }
 
+[data-theme='verde'] {           /* CRT VERDE (fosforo P1 clasico) */
+  --bg-screen: #02160a;
+  --bg-panel: #06210f;
+  --bg-panel-2: #0a2c16;
+  --bg-left: #051c0c;
+  --phosphor-pink: #8fffb1;
+  --petal-white: #e0ffe8;
+  --neon-pink: #3dff7a;
+  --celadon: #d8c98f;
+  --pink-dim: #5ac47e;
+  --pink-faint: #266f3e;
+  --glow-neon: 61, 255, 122;
+  --glow-pink: 143, 255, 177;
+  --glow-cel: 216, 201, 143;
+  --border: rgba(61, 255, 122, 0.26);
+}
+
+[data-theme='rojo'] {            /* CRT ROJO */
+  --bg-screen: #1a0505;
+  --bg-panel: #240808;
+  --bg-panel-2: #2e0c0c;
+  --bg-left: #200606;
+  --phosphor-pink: #ff8f8f;
+  --petal-white: #ffe0e0;
+  --neon-pink: #ff3d3d;
+  --celadon: #8fd8c4;
+  --pink-dim: #c45a5a;
+  --pink-faint: #6f2626;
+  --glow-neon: 255, 61, 61;
+  --glow-pink: 255, 143, 143;
+  --glow-cel: 143, 216, 196;
+  --border: rgba(255, 61, 61, 0.26);
+}
+
+[data-theme='purpura'] {         /* CRT PURPURA */
+  --bg-screen: #10051a;
+  --bg-panel: #180a24;
+  --bg-panel-2: #200e2e;
+  --bg-left: #140620;
+  --phosphor-pink: #c68fff;
+  --petal-white: #eee0ff;
+  --neon-pink: #a83dff;
+  --celadon: #86e0bf;
+  --pink-dim: #965ac4;
+  --pink-faint: #4a266f;
+  --glow-neon: 168, 61, 255;
+  --glow-pink: 198, 143, 255;
+  --glow-cel: 134, 224, 191;
+  --border: rgba(168, 61, 255, 0.26);
+}
+
 /* Reset de body */
 * {
   box-sizing: border-box;

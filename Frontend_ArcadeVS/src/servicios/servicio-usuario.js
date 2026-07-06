@@ -40,3 +40,14 @@ export async function actualizar_perfil(datos) {
   const { data } = await api.put('/usuarios/perfil', datos);
   return data.usuario;
 }
+
+/**
+ * Actualiza el nombre visible (alias) del usuario autenticado.
+ *
+ * @param {string} nombre - Nuevo nombre visible.
+ * @returns {Promise<object>} El usuario actualizado (campos publicos).
+ */
+export async function actualizar_nombre(nombre) {
+  const { data } = await api.put('/usuarios/nombre', { nombre });
+  return data.usuario;
+}

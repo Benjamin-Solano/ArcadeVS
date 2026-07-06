@@ -98,6 +98,20 @@ export async function obtener_tags_de_juego(id_juego) {
 }
 
 /**
+ * Lista los tags del catalogo (ordenados por nombre). Sirve como ejes de
+ * respaldo para el radar del perfil cuando el usuario aun no ha jugado.
+ *
+ * @param {number} [limite] - Maximo de tags a devolver (por defecto 7).
+ * @returns {Promise<Array<{nombre: string}>>} Tags del catalogo.
+ */
+export async function obtener_catalogo_tags(limite = 7) {
+  return consultar(
+    `SELECT nombre FROM tags ORDER BY nombre ASC LIMIT $1`,
+    [limite],
+  );
+}
+
+/**
  * Lista los juegos activos que tienen un tag especifico.
  *
  * @param {string} nombre_tag - Nombre del tag (en minusculas).

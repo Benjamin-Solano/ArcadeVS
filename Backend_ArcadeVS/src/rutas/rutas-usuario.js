@@ -19,6 +19,7 @@ import {
   obtener_perfil,
   obtener_estadisticas,
   actualizar_perfil,
+  actualizar_nombre,
   actualizar_rol,
 } from '../servicios/servicio-usuario.js';
 import { obtener_historial } from '../servicios/servicio-historial.js';
@@ -49,6 +50,18 @@ export async function registrar_rutas_usuario(servidor) {
       peticion.body ?? {},
     );
     // Puente REST → bus: notifica a las conexiones del usuario (si el bus existe).
+    if (peticion.server.io) {
+      emitir_perfil_actualizado(peticion.server.io, usuario.id_usuario, usuario);
+    }
+    return { usuario };
+  });
+
+  /** Actualiza el nombre visible (alias) del usuario autenticado. */
+  servidor.put('/nombre', async (peticion) => {
+    const usuario = await actualizar_nombre(
+      peticion.usuario.id_usuario,
+      peticion.body?.nombre,
+    );
     if (peticion.server.io) {
       emitir_perfil_actualizado(peticion.server.io, usuario.id_usuario, usuario);
     }

@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { ContextoTema } from '../contextos/contexto-tema.jsx';
 import GlifoPixel from './crt/glifo-pixel.jsx';
-import BadgeTema from './crt/badge-tema.jsx';
+import SelectorTema from './crt/selector-tema.jsx';
 
 /** Secciones de navegacion del inicio. El id se usa para marcar la activa. */
 const SECCIONES = [
@@ -180,7 +180,7 @@ export default function BarraNavegacion({ usuario, activo = 'inicio', al_navegar
               {nombre}
             </div>
           </button>
-          <BadgeTema />
+          <SelectorTema />
           <button
             type="button"
             onClick={al_cerrar_sesion}
