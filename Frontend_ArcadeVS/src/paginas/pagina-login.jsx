@@ -73,7 +73,7 @@ export default function PaginaLogin({ ir_a_registro, al_iniciar_sesion }) {
       </div>
 
       <div style={{ textAlign: 'right', marginTop: '10px' }}>
-        <span style={{ position: 'relative', cursor: 'pointer', fontFamily: "'Silkscreen', monospace", fontSize: '8px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
+        <span style={{ position: 'relative', cursor: 'pointer', fontFamily: "'Silkscreen', monospace", fontSize: '10px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
           OLVIDASTE TU CONTRASENA?
           <span style={{ position: 'absolute', left: 0, right: 0, bottom: '-3px', height: '1px', background: 'rgba(var(--glow-neon),.7)' }} />
         </span>
@@ -85,7 +85,7 @@ export default function PaginaLogin({ ir_a_registro, al_iniciar_sesion }) {
       <BiosButton texto={cargando ? 'INGRESANDO...' : 'INICIAR SESION'} seleccionado disabled={cargando} onClick={manejar_login} />
       <Separador style={{ margin: '14px 0' }} />
 
-      <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '9px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
+      <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '11px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
         NO TIENES UNA CUENTA?{' '}
         <span onClick={ir_a_registro} style={{ position: 'relative', cursor: 'pointer', color: 'var(--phosphor-pink)' }}>
           REGISTRATE
@@ -112,7 +112,7 @@ function Titulo() {
       >
         INICIAR SESION
       </div>
-      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '9px', letterSpacing: '0.10em', color: 'var(--pink-dim)', marginTop: '10px' }}>
+      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '11px', letterSpacing: '0.10em', color: 'var(--pink-dim)', marginTop: '10px' }}>
         INGRESA TUS DATOS PARA ACCEDER.
       </div>
     </div>

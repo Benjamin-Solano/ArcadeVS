@@ -79,7 +79,7 @@ function PanelHero({ hero_l1, hero_l2, subtexto_l1, subtexto_l2, tema }) {
           <div
             style={{
               fontFamily: "'Silkscreen', monospace",
-              fontSize: '9px',
+              fontSize: '11px',
               letterSpacing: '0.12em',
               marginTop: '14px',
               color: 'var(--pink-dim)',
@@ -90,7 +90,7 @@ function PanelHero({ hero_l1, hero_l2, subtexto_l1, subtexto_l2, tema }) {
           <div
             style={{
               fontFamily: "'Silkscreen', monospace",
-              fontSize: '9px',
+              fontSize: '11px',
               letterSpacing: '0.12em',
               marginTop: '6px',
               color: 'var(--pink-faint)',
@@ -151,7 +151,7 @@ export default function LayoutAuth({ hero, pantalla, children }) {
             marginTop: 'auto',
             paddingTop: '32px',
             fontFamily: "'Silkscreen', monospace",
-            fontSize: '8px',
+            fontSize: '10px',
             letterSpacing: '0.14em',
             color: 'var(--pink-faint)',
           }}
