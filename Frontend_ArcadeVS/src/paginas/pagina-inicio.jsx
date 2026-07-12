@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import OverlaysCrt from '../componentes/crt/overlays-crt.jsx';
 import BarraNavegacion from '../componentes/barra-navegacion.jsx';
+import SeccionInicio from '../componentes/inicio/seccion-inicio.jsx';
 import PaginaPerfil from './pagina-perfil.jsx';
 
+/** Secciones que ya tienen contenido desarrollado; el resto usa el marcador de posicion. */
+const SECCIONES_LISTAS = ['inicio', 'perfil'];
+
 /**
- * PaginaInicio — pantalla principal tras iniciar sesion. Por ahora solo monta la
- * barra de navegacion superior sobre el fondo CRT; el contenido del body queda
- * como marcador de posicion hasta desarrollar las secciones.
+ * PaginaInicio — pantalla principal tras iniciar sesion. Monta la barra de
+ * navegacion superior sobre el fondo CRT y despacha el contenido segun la
+ * seccion activa (INICIO y PERFIL ya tienen pantalla propia; el resto queda
+ * como marcador de posicion hasta desarrollarse).
  *
  * @param {object} props
  * @param {object} props.usuario - Usuario en sesion.
@@ -27,9 +32,9 @@ export default function PaginaInicio({ usuario, al_cerrar_sesion, al_actualizar_
       />
 
       <main style={{ position: 'relative', minHeight: 'calc(100vh - 84px)', padding: '24px' }}>
-        {seccion_activa === 'perfil' ? (
-          <PaginaPerfil usuario={usuario} al_actualizar_usuario={al_actualizar_usuario} />
-        ) : (
+        {seccion_activa === 'inicio' && <SeccionInicio usuario={usuario} />}
+        {seccion_activa === 'perfil' && <PaginaPerfil usuario={usuario} al_actualizar_usuario={al_actualizar_usuario} />}
+        {!SECCIONES_LISTAS.includes(seccion_activa) && (
           // Marcador de posicion del resto de secciones — se desarrollara mas adelante
           <div
             style={{
@@ -38,7 +43,7 @@ export default function PaginaInicio({ usuario, al_cerrar_sesion, al_actualizar_
               justifyContent: 'center',
               minHeight: 'calc(100vh - 132px)',
               fontFamily: "'Silkscreen', monospace",
-              fontSize: '10px',
+              fontSize: '12px',
               letterSpacing: '0.14em',
               color: 'var(--pink-faint)',
             }}
