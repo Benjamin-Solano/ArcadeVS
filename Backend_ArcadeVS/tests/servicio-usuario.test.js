@@ -16,6 +16,7 @@ import {
   obtener_perfil,
   actualizar_perfil,
   actualizar_rol,
+  buscar_usuario_por_codigo_amigo,
 } from '../src/servicios/servicio-usuario.js';
 import { ErrorServicio } from '../src/servicios/error-servicio.js';
 import { consultar, cerrar_pool } from '../src/configuracion/configuracion-db.js';
@@ -157,6 +158,30 @@ describe('servicio-usuario', () => {
 
     const promovido = await actualizar_rol(admin.id_usuario, objetivo.id_usuario, 'admin');
     expect(promovido.rol).toBe('admin');
+  });
+
+  it('buscar_usuario_por_codigo_amigo encuentra al usuario y omite datos privados', async () => {
+    const { usuario } = await registrar_de_prueba();
+
+    const encontrado = await buscar_usuario_por_codigo_amigo(usuario.codigo_amigo);
+    expect(encontrado.id_usuario).toBe(usuario.id_usuario);
+    expect(encontrado).not.toHaveProperty('correo');
+    expect(encontrado).not.toHaveProperty('fecha_nacimiento');
+  });
+
+  it('buscar_usuario_por_codigo_amigo no distingue mayusculas/minusculas', async () => {
+    const { usuario } = await registrar_de_prueba();
+
+    const encontrado = await buscar_usuario_por_codigo_amigo(
+      usuario.codigo_amigo.toLowerCase(),
+    );
+    expect(encontrado.id_usuario).toBe(usuario.id_usuario);
+  });
+
+  it('buscar_usuario_por_codigo_amigo lanza 404 si el codigo no existe', async () => {
+    await expect(
+      buscar_usuario_por_codigo_amigo('AAAAAAAAAAAA'),
+    ).rejects.toMatchObject({ codigo: 'USUARIO_NO_ENCONTRADO', estado_http: 404 });
   });
 
   it('actualizar_rol rechaza un rol invalido', async () => {

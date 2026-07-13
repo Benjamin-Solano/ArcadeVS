@@ -12,6 +12,7 @@
  *   PUT  /usuarios/perfil        → actualiza el perfil propio.
  *   GET  /usuarios/historial     → historial de partidas propio.
  *   GET  /usuarios/rankings      → rankings propios por juego.
+ *   GET  /usuarios/buscar/:codigo_amigo → datos publicos minimos de otro usuario.
  *   PUT  /usuarios/:id/rol       → cambia el rol de un usuario (solo admin).
  */
 
@@ -21,6 +22,7 @@ import {
   actualizar_perfil,
   actualizar_nombre,
   actualizar_rol,
+  buscar_usuario_por_codigo_amigo,
 } from '../servicios/servicio-usuario.js';
 import { obtener_historial } from '../servicios/servicio-historial.js';
 import { obtener_rankings_usuario } from '../servicios/servicio-leaderboard.js';
@@ -84,6 +86,12 @@ export async function registrar_rutas_usuario(servidor) {
   servidor.get('/rankings', async (peticion) => {
     const rankings = await obtener_rankings_usuario(peticion.usuario.id_usuario);
     return { rankings };
+  });
+
+  /** Busca los datos publicos minimos de otro usuario por su codigo de amigo. */
+  servidor.get('/buscar/:codigo_amigo', async (peticion) => {
+    const usuario = await buscar_usuario_por_codigo_amigo(peticion.params.codigo_amigo);
+    return { usuario };
   });
 
   /** Cambia el rol de un usuario. El servicio exige que el solicitante sea admin. */
