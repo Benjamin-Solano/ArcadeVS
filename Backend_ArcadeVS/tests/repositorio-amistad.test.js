@@ -91,6 +91,18 @@ describe('repositorio-amistad', () => {
     expect(pendientes_b.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('obtener_solicitudes_pendientes incluye los datos publicos del otro usuario y la direccion', async () => {
+    const [pendiente_a] = await obtener_solicitudes_pendientes(id_a);
+    const [pendiente_b] = await obtener_solicitudes_pendientes(id_b);
+
+    expect(pendiente_a.usuario.id_usuario).toBe(id_b);
+    expect(pendiente_b.usuario.id_usuario).toBe(id_a);
+    // guardar_solicitud(id_mayor, id_menor) normaliza a solicitante = id_menor:
+    // enviada_por_mi debe ser true para quien coincide con id_menor y false para el otro.
+    expect(pendiente_a.enviada_por_mi).toBe(id_a === id_menor);
+    expect(pendiente_b.enviada_por_mi).toBe(id_b === id_menor);
+  });
+
   it('el CHECK impide una solicitud duplicada invertida', async () => {
     // Ya existe (menor, mayor); intentar de nuevo (invertido) viola UNIQUE.
     await expect(guardar_solicitud(id_b, id_a)).rejects.toThrow();

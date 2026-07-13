@@ -140,20 +140,47 @@ export async function contar_amigos(id_usuario) {
 }
 
 /**
- * Lista las solicitudes pendientes en las que participa un usuario.
+ * Lista las solicitudes pendientes en las que participa un usuario, con los
+ * datos publicos del otro participante (igual que obtener_amigos) para que el
+ * cliente pueda mostrar la solicitud sin una segunda consulta. Incluye
+ * `enviada_por_mi` para que el cliente distinga las que debe responder
+ * (aceptar/rechazar) de las que ya envio y solo esta esperando.
  *
  * @param {string} id_usuario - UUID del usuario.
- * @returns {Promise<Array<object>>} Solicitudes en estado 'pendiente'.
+ * @returns {Promise<Array<{id_solicitud: string, estado: string,
+ *          fecha_solicitud: string, enviada_por_mi: boolean, usuario: object}>>}
+ *          Solicitudes en estado 'pendiente'.
  */
 export async function obtener_solicitudes_pendientes(id_usuario) {
-  return consultar(
-    `SELECT ${CAMPOS_SOLICITUD}
-       FROM solicitudes_amistad
-      WHERE (id_solicitante = $1 OR id_receptor = $1)
-        AND estado = 'pendiente'
-      ORDER BY fecha_solicitud DESC`,
+  const filas = await consultar(
+    `SELECT s.id_solicitud, s.estado, s.fecha_solicitud,
+            (s.id_solicitante = $1) AS enviada_por_mi,
+            u.id_usuario, u.nombre, u.apellido, u.codigo_amigo, u.avatar_url
+       FROM solicitudes_amistad s
+       JOIN usuarios u
+         ON u.id_usuario = CASE
+              WHEN s.id_solicitante = $1 THEN s.id_receptor
+              ELSE s.id_solicitante
+            END
+      WHERE (s.id_solicitante = $1 OR s.id_receptor = $1)
+        AND s.estado = 'pendiente'
+      ORDER BY s.fecha_solicitud DESC`,
     [id_usuario],
   );
+
+  return filas.map((fila) => ({
+    id_solicitud: fila.id_solicitud,
+    estado: fila.estado,
+    fecha_solicitud: fila.fecha_solicitud,
+    enviada_por_mi: fila.enviada_por_mi,
+    usuario: {
+      id_usuario: fila.id_usuario,
+      nombre: fila.nombre,
+      apellido: fila.apellido,
+      codigo_amigo: fila.codigo_amigo,
+      avatar_url: fila.avatar_url,
+    },
+  }));
 }
 
 /**
