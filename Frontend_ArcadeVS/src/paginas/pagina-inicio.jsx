@@ -2,6 +2,7 @@ import { useState } from 'react';
 import OverlaysCrt from '../componentes/crt/overlays-crt.jsx';
 import BarraNavegacion from '../componentes/barra-navegacion.jsx';
 import PaginaPerfil from './pagina-perfil.jsx';
+import PaginaAmigos from './pagina-amigos.jsx';
 
 /**
  * PaginaInicio — pantalla principal tras iniciar sesion. Por ahora solo monta la
@@ -29,6 +30,8 @@ export default function PaginaInicio({ usuario, al_cerrar_sesion, al_actualizar_
       <main style={{ position: 'relative', minHeight: 'calc(100vh - 84px)', padding: '24px' }}>
         {seccion_activa === 'perfil' ? (
           <PaginaPerfil usuario={usuario} al_actualizar_usuario={al_actualizar_usuario} />
+        ) : seccion_activa === 'amigos' ? (
+          <PaginaAmigos />
         ) : (
           // Marcador de posicion del resto de secciones — se desarrollara mas adelante
           <div
