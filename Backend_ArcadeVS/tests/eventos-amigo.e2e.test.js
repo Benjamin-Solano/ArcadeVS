@@ -61,6 +61,11 @@ function esperar_evento(cliente, evento) {
   return new Promise((resolver) => cliente.once(evento, resolver));
 }
 
+/** Emite un evento con ack y resuelve con la respuesta del servidor. */
+function emitir_con_ack(cliente, evento, datos) {
+  return new Promise((resolver) => cliente.emit(evento, datos, resolver));
+}
+
 beforeAll(async () => {
   id_a = await crear_usuario();
   id_b = await crear_usuario();
@@ -86,19 +91,23 @@ describe('eventos:amigo (end-to-end)', () => {
     const cliente_b = await conectar_cliente(token_b);
     try {
       const recibida = esperar_evento(cliente_b, 'amigo:solicitud_recibida');
-      cliente_a.emit('amigo:solicitud_enviada', { id_usuario_destino: id_b });
+      const ack_envio = emitir_con_ack(cliente_a, 'amigo:solicitud_enviada', {
+        id_usuario_destino: id_b,
+      });
 
-      const datos_recibida = await recibida;
+      const [datos_recibida, respuesta_envio] = await Promise.all([recibida, ack_envio]);
+      expect(respuesta_envio).toEqual({ ok: true });
       expect(datos_recibida.id_usuario_origen).toBe(id_a);
       expect(datos_recibida.id_solicitud).toBeTruthy();
 
       const vinculo_a = esperar_evento(cliente_a, 'amigo:vinculo_confirmado');
       const vinculo_b = esperar_evento(cliente_b, 'amigo:vinculo_confirmado');
-      cliente_b.emit('amigo:solicitud_aceptada', {
+      const ack_aceptar = emitir_con_ack(cliente_b, 'amigo:solicitud_aceptada', {
         id_solicitud: datos_recibida.id_solicitud,
       });
 
-      const [pa, pb] = await Promise.all([vinculo_a, vinculo_b]);
+      const [pa, pb, respuesta_aceptar] = await Promise.all([vinculo_a, vinculo_b, ack_aceptar]);
+      expect(respuesta_aceptar).toEqual({ ok: true });
       expect([pa.id_usuario_a, pa.id_usuario_b].sort()).toEqual([id_a, id_b].sort());
       expect([pb.id_usuario_a, pb.id_usuario_b].sort()).toEqual([id_a, id_b].sort());
     } finally {
