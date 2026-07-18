@@ -94,7 +94,7 @@ export default function PaginaRegistro({ ir_a_verificacion, ir_a_login }) {
         <InputField etiqueta="CONFIRMAR CONTRASENA" obligatorio placeholder="REPITE TU CONTRASENA" tipo="password" valor={datos.confirmar} onChange={actualizar('confirmar')} ayuda="DEBE COINCIDIR CON LA CONTRASENA" />
       </div>
 
-      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '8px', letterSpacing: '0.12em', color: 'var(--pink-faint)', marginTop: '10px' }}>
+      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '10px', letterSpacing: '0.12em', color: 'var(--pink-faint)', marginTop: '10px' }}>
         MINIMO 8 CARACTERES.
       </div>
 
@@ -104,7 +104,7 @@ export default function PaginaRegistro({ ir_a_verificacion, ir_a_login }) {
       <BiosButton texto={cargando ? 'REGISTRANDO...' : 'REGISTRARSE'} seleccionado disabled={cargando} onClick={manejar_registro} />
       <Separador style={{ margin: '14px 0' }} />
 
-      <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '9px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
+      <div style={{ textAlign: 'center', fontFamily: "'Silkscreen', monospace", fontSize: '11px', letterSpacing: '0.10em', color: 'var(--pink-dim)' }}>
         YA TIENES UNA CUENTA?{' '}
         <span onClick={ir_a_login} style={{ position: 'relative', cursor: 'pointer', color: 'var(--phosphor-pink)' }}>
           INICIA SESION
@@ -131,7 +131,7 @@ function Titulo() {
       >
         CREAR CUENTA
       </div>
-      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '9px', letterSpacing: '0.10em', color: 'var(--pink-dim)', marginTop: '10px' }}>
+      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '11px', letterSpacing: '0.10em', color: 'var(--pink-dim)', marginTop: '10px' }}>
         INGRESA TUS DATOS PARA REGISTRARTE.
       </div>
     </div>

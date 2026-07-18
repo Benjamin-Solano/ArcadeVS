@@ -22,7 +22,7 @@ export default function BiosButton({ texto, seleccionado = false, disabled = fal
     color: 'var(--phosphor-pink)',
     fontFamily: "'Silkscreen', monospace",
     fontWeight: 700,
-    fontSize: '10px',
+    fontSize: '12px',
     letterSpacing: '0.16em',
     textTransform: 'uppercase',
     display: 'flex',

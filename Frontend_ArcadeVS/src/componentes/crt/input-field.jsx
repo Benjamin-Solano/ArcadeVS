@@ -30,7 +30,7 @@ export default function InputField({
         <span
           style={{
             fontFamily: "'Silkscreen', monospace",
-            fontSize: '10px',
+            fontSize: '12px',
             letterSpacing: '0.12em',
             color: 'var(--pink-dim)',
             textTransform: 'uppercase',
@@ -43,7 +43,7 @@ export default function InputField({
             style={{
               fontFamily: "'Silkscreen', monospace",
               fontWeight: 700,
-              fontSize: '10px',
+              fontSize: '12px',
               color: 'var(--neon-pink)',
               textShadow: '0 0 6px rgba(var(--glow-neon), 0.7)',
             }}
@@ -70,7 +70,7 @@ export default function InputField({
             border: `1px solid rgba(var(--glow-neon), ${enfocado ? 0.75 : 0.35})`,
             color: 'var(--petal-white)',
             fontFamily: "'Silkscreen', monospace",
-            fontSize: '10px',
+            fontSize: '12px',
             letterSpacing: '0.08em',
             outline: 'none',
             boxShadow: enfocado ? 'inset 0 0 10px rgba(var(--glow-neon), 0.18)' : 'none',
@@ -89,7 +89,7 @@ export default function InputField({
             color: 'var(--celadon)',
             fontFamily: "'VT323', monospace",
             fontWeight: 700,
-            fontSize: '13px',
+            fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

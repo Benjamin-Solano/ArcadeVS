@@ -19,7 +19,7 @@ export default function MensajeError({ texto }) {
         background: 'var(--bg-panel-2)',
         color: 'var(--neon-pink)',
         fontFamily: "'Silkscreen', monospace",
-        fontSize: '9px',
+        fontSize: '11px',
         letterSpacing: '0.10em',
         textAlign: 'center',
         textShadow: '0 0 6px rgba(var(--glow-neon), 0.6)',
