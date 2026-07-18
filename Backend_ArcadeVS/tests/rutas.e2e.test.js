@@ -192,6 +192,49 @@ describe('rutas protegidas de usuario', () => {
   });
 });
 
+describe('GET /usuarios/buscar/:codigo_amigo', () => {
+  it('rechaza sin token (401)', async () => {
+    const respuesta = await servidor.inject({
+      method: 'GET',
+      url: '/usuarios/buscar/AAAAAAAAAAAA',
+    });
+    expect(respuesta.statusCode).toBe(401);
+  });
+
+  it('encuentra a otro usuario por su codigo de amigo y omite datos privados', async () => {
+    const { token } = await registrar_verificado_y_login();
+    const objetivo = await registrar_verificado_y_login();
+    const codigo_amigo = (
+      await servidor.inject({
+        method: 'GET',
+        url: '/usuarios/perfil',
+        headers: { authorization: `Bearer ${objetivo.token}` },
+      })
+    ).json().usuario.codigo_amigo;
+
+    const respuesta = await servidor.inject({
+      method: 'GET',
+      url: `/usuarios/buscar/${codigo_amigo}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(respuesta.statusCode).toBe(200);
+    expect(respuesta.json().usuario.id_usuario).toBe(objetivo.id_usuario);
+    expect(respuesta.json().usuario).not.toHaveProperty('correo');
+  });
+
+  it('devuelve 404 si el codigo de amigo no existe', async () => {
+    const { token } = await registrar_verificado_y_login();
+
+    const respuesta = await servidor.inject({
+      method: 'GET',
+      url: '/usuarios/buscar/AAAAAAAAAAAA',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(respuesta.statusCode).toBe(404);
+    expect(respuesta.json().codigo).toBe('USUARIO_NO_ENCONTRADO');
+  });
+});
+
 describe('rutas publicas de juego', () => {
   it('lista el catalogo de juegos', async () => {
     const respuesta = await servidor.inject({ method: 'GET', url: '/juegos' });

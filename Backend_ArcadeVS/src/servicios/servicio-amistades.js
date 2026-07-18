@@ -4,11 +4,8 @@
  * No escribe SQL (delega en repositorio-amistad) ni emite eventos Socket.io.
  * Aplica las reglas de negocio: no permitir amistad consigo mismo, verificar la
  * existencia del usuario destino y evitar solicitudes/vinculos duplicados. El
- * orden canonico de los UUID (regla b) lo garantiza el repositorio.
- *
- * Nota: por el orden canonico, la tabla no conserva la direccion de la solicitud
- * (quien la envio). El id del destino se conoce solo en tiempo de ejecucion y lo
- * usa la capa de eventos para la notificacion en vivo.
+ * orden canonico de los UUID (regla b) lo garantiza el repositorio; la
+ * direccion real (quien envio) se persiste aparte en id_emisor.
  */
 
 import {
@@ -16,6 +13,7 @@ import {
   obtener_solicitud_entre,
   obtener_solicitud_por_id,
   actualizar_estado,
+  reactivar_solicitud,
   obtener_amigos,
   obtener_solicitudes_pendientes,
   eliminar_solicitud,
@@ -64,7 +62,7 @@ export async function enviar_solicitud(id_emisor, id_destino) {
   }
 
   const solicitud = existente
-    ? await actualizar_estado(existente.id_solicitud, 'pendiente')
+    ? await reactivar_solicitud(existente.id_solicitud, id_emisor)
     : await guardar_solicitud(id_emisor, id_destino);
 
   return { solicitud, id_emisor, id_destino };

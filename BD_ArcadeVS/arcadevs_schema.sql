@@ -84,6 +84,7 @@ CREATE TABLE solicitudes_amistad (
     id_solicitud    UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
     id_solicitante  UUID        NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
     id_receptor     UUID        NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    id_emisor       UUID        REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
     estado          VARCHAR(20) NOT NULL DEFAULT 'pendiente'
                     CHECK (estado IN ('pendiente', 'aceptado', 'rechazado', 'bloqueado')),
     fecha_solicitud TIMESTAMP   NOT NULL DEFAULT NOW(),
@@ -96,8 +97,9 @@ CREATE TABLE solicitudes_amistad (
 );
 
 COMMENT ON TABLE  solicitudes_amistad                IS 'Solicitudes de amistad entre usuarios. Cubre tanto solicitudes pendientes como amistades confirmadas (estado = aceptado).';
-COMMENT ON COLUMN solicitudes_amistad.id_solicitante IS 'UUID del usuario que inicia la solicitud. Siempre menor que id_receptor (orden canónico).';
-COMMENT ON COLUMN solicitudes_amistad.id_receptor    IS 'UUID del usuario que recibe la solicitud. Siempre mayor que id_solicitante.';
+COMMENT ON COLUMN solicitudes_amistad.id_solicitante IS 'UUID menor del par en orden canónico. NO es necesariamente quien inició la solicitud (ver id_emisor).';
+COMMENT ON COLUMN solicitudes_amistad.id_receptor    IS 'UUID mayor del par en orden canónico. NO es necesariamente quien recibió la solicitud (ver id_emisor).';
+COMMENT ON COLUMN solicitudes_amistad.id_emisor      IS 'UUID de quien realmente inició/reenvió la solicitud. NULL en filas creadas antes de la migración 003.';
 COMMENT ON COLUMN solicitudes_amistad.estado         IS 'pendiente | aceptado | rechazado | bloqueado. Filtrar por aceptado para obtener amigos confirmados.';
 
 
