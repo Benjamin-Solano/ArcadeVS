@@ -8,6 +8,7 @@
 
 import api from './servicio-api.js';
 import { guardar_sesion, eliminar_sesion } from './almacenamiento-sesion.js';
+import { conectar_socket, desconectar_socket } from './servicio-socket.js';
 
 /**
  * Registra una cuenta nueva. La cuenta nace NO verificada; el backend envia un
@@ -59,10 +60,12 @@ export async function reenviar_codigo(correo) {
 export async function iniciar_sesion(correo, contrasena) {
   const { data } = await api.post('/auth/login', { correo, contrasena });
   guardar_sesion(data.token, data.usuario);
+  conectar_socket();
   return data.usuario;
 }
 
-/** Cierra la sesion eliminando el token y el usuario del navegador. */
+/** Cierra la sesion: desconecta el socket en tiempo real y borra el token y el usuario del navegador. */
 export function cerrar_sesion() {
+  desconectar_socket();
   eliminar_sesion();
 }
