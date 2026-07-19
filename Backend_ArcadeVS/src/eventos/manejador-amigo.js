@@ -15,6 +15,11 @@
  *   amigo:solicitud_recibida   (Servidor → destino)
  *   amigo:vinculo_confirmado   (Servidor → ambos)
  *   amigo:error                (Servidor → emisor)
+ *
+ * Los tres manejadores aceptan un `callback` opcional (ack de Socket.io):
+ * el cliente lo pasa como tercer argumento de `socket.emit` para saber cuando
+ * el servidor ya termino de procesar la accion (sin depender de un timeout
+ * arbitrario ni de otro evento) antes de refrescar su vista.
  */
 
 import { ErrorServicio } from '../servicios/error-servicio.js';
@@ -48,9 +53,10 @@ function exigir_usuario(socket) {
  * @param {import('socket.io').Server} io - Servidor Socket.io.
  * @param {import('socket.io').Socket} socket - Socket del emisor.
  * @param {object} datos - Payload { id_usuario_destino }.
+ * @param {(respuesta: {ok: boolean}) => void} [callback] - Ack opcional del cliente.
  * @returns {Promise<void>}
  */
-export async function manejar_solicitud_enviada(io, socket, datos) {
+export async function manejar_solicitud_enviada(io, socket, datos, callback) {
   try {
     const id_emisor = exigir_usuario(socket);
     const { solicitud, id_destino } = await enviar_solicitud(
@@ -61,8 +67,10 @@ export async function manejar_solicitud_enviada(io, socket, datos) {
       id_solicitud: solicitud.id_solicitud,
       id_usuario_origen: id_emisor,
     });
+    callback?.({ ok: true });
   } catch (error) {
     emitir_error(socket, error);
+    callback?.({ ok: false });
   }
 }
 
@@ -74,24 +82,26 @@ export async function manejar_solicitud_enviada(io, socket, datos) {
  * @param {import('socket.io').Socket} socket - Socket de quien responde.
  * @param {object} datos - Payload { id_solicitud }.
  * @param {boolean} aceptar - true para aceptar, false para rechazar.
+ * @param {(respuesta: {ok: boolean}) => void} [callback] - Ack opcional del cliente.
  * @returns {Promise<void>}
  */
-export async function manejar_respuesta_solicitud(io, socket, datos, aceptar) {
+export async function manejar_respuesta_solicitud(io, socket, datos, aceptar, callback) {
   try {
     const id_usuario = exigir_usuario(socket);
     const solicitud = await responder_solicitud(id_usuario, datos?.id_solicitud, aceptar);
-    if (!aceptar) {
-      return;
+    if (aceptar) {
+      const payload = {
+        id_usuario_a: solicitud.id_solicitante,
+        id_usuario_b: solicitud.id_receptor,
+      };
+      io.to(sala_de_usuario(solicitud.id_solicitante))
+        .to(sala_de_usuario(solicitud.id_receptor))
+        .emit('amigo:vinculo_confirmado', payload);
     }
-    const payload = {
-      id_usuario_a: solicitud.id_solicitante,
-      id_usuario_b: solicitud.id_receptor,
-    };
-    io.to(sala_de_usuario(solicitud.id_solicitante))
-      .to(sala_de_usuario(solicitud.id_receptor))
-      .emit('amigo:vinculo_confirmado', payload);
+    callback?.({ ok: true });
   } catch (error) {
     emitir_error(socket, error);
+    callback?.({ ok: false });
   }
 }
 
@@ -123,13 +133,13 @@ function emitir_error(socket, error) {
  * @returns {void}
  */
 export function registrar_manejador_amigo(io, socket) {
-  socket.on('amigo:solicitud_enviada', (datos) =>
-    manejar_solicitud_enviada(io, socket, datos),
+  socket.on('amigo:solicitud_enviada', (datos, callback) =>
+    manejar_solicitud_enviada(io, socket, datos, callback),
   );
-  socket.on('amigo:solicitud_aceptada', (datos) =>
-    manejar_respuesta_solicitud(io, socket, datos, true),
+  socket.on('amigo:solicitud_aceptada', (datos, callback) =>
+    manejar_respuesta_solicitud(io, socket, datos, true, callback),
   );
-  socket.on('amigo:solicitud_rechazada', (datos) =>
-    manejar_respuesta_solicitud(io, socket, datos, false),
+  socket.on('amigo:solicitud_rechazada', (datos, callback) =>
+    manejar_respuesta_solicitud(io, socket, datos, false, callback),
   );
 }

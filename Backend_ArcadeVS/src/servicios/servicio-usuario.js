@@ -245,6 +245,39 @@ export async function actualizar_perfil(id_usuario, datos = {}) {
 }
 
 /**
+ * Busca un usuario por su codigo de amigo (flujo de agregar amigos). Devuelve
+ * solo los campos publicos minimos, no el perfil completo: cualquier usuario
+ * autenticado puede consultar un codigo ajeno.
+ *
+ * @param {string} codigo_amigo - Codigo de amigo de 12 caracteres.
+ * @returns {Promise<{id_usuario: string, nombre: string, apellido: string,
+ *          avatar_url: string|null, codigo_amigo: string}>} Datos minimos del usuario.
+ */
+export async function buscar_usuario_por_codigo_amigo(codigo_amigo) {
+  if (typeof codigo_amigo !== 'string' || codigo_amigo.trim() === '') {
+    throw new ErrorServicio('DATOS_INVALIDOS', 'El campo codigo_amigo es obligatorio.');
+  }
+  const limpio = codigo_amigo.trim().toUpperCase();
+
+  const encontrado = await obtener_usuario_por_codigo_amigo(limpio);
+  if (!encontrado) {
+    throw new ErrorServicio(
+      'USUARIO_NO_ENCONTRADO',
+      'No existe un usuario con ese codigo de amigo.',
+      404,
+    );
+  }
+
+  return {
+    id_usuario: encontrado.id_usuario,
+    nombre: encontrado.nombre,
+    apellido: encontrado.apellido,
+    avatar_url: encontrado.avatar_url,
+    codigo_amigo: encontrado.codigo_amigo,
+  };
+}
+
+/**
  * Cambia el rol de un usuario. Solo un administrador puede hacerlo (por eso el
  * primer admin debe sembrarse manualmente en la BD).
  *

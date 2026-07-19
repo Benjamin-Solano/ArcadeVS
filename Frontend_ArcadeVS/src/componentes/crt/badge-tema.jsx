@@ -20,7 +20,7 @@ export default function BadgeTema() {
         border: '1px solid rgba(var(--glow-neon), 0.4)',
         color: 'var(--neon-pink)',
         fontFamily: "'Silkscreen', monospace",
-        fontSize: '9px',
+        fontSize: '11px',
         letterSpacing: '0.12em',
         display: 'flex',
         alignItems: 'center',

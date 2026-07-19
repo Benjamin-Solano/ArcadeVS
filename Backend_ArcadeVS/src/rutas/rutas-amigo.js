@@ -33,7 +33,7 @@ export async function registrar_rutas_amigo(servidor) {
     return { amigos };
   });
 
-  /** Lista las solicitudes pendientes del usuario autenticado. */
+  /** Lista las solicitudes pendientes del usuario, con los datos publicos del otro participante. */
   servidor.get('/solicitudes', async (peticion) => {
     const solicitudes = await obtener_solicitudes(peticion.usuario.id_usuario);
     return { solicitudes };

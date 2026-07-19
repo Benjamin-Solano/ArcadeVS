@@ -12,6 +12,7 @@ import {
   guardar_solicitud,
   obtener_solicitud_entre,
   actualizar_estado,
+  reactivar_solicitud,
   obtener_amigos,
   obtener_solicitudes_pendientes,
 } from '../src/repositorios/repositorio-amistad.js';
@@ -66,11 +67,14 @@ describe('repositorio-amistad', () => {
   });
 
   it('guardar_solicitud almacena el par en orden canonico aunque se pase invertido', async () => {
-    // Se pasa (mayor, menor) a proposito: debe guardarse solicitante = menor.
+    // Se llama guardar_solicitud(emisor=mayor, destino=menor) a proposito:
+    // el orden canonico debe guardarse solicitante = menor, pero id_emisor
+    // debe conservar quien realmente la envio (mayor), sin importar ese orden.
     const solicitud = await guardar_solicitud(id_mayor, id_menor);
 
     expect(solicitud.id_solicitante).toBe(id_menor);
     expect(solicitud.id_receptor).toBe(id_mayor);
+    expect(solicitud.id_emisor).toBe(id_mayor);
     expect(solicitud.estado).toBe('pendiente');
   });
 
@@ -91,9 +95,36 @@ describe('repositorio-amistad', () => {
     expect(pendientes_b.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('obtener_solicitudes_pendientes incluye los datos publicos del otro usuario y la direccion real', async () => {
+    const [pendiente_a] = await obtener_solicitudes_pendientes(id_a);
+    const [pendiente_b] = await obtener_solicitudes_pendientes(id_b);
+
+    expect(pendiente_a.usuario.id_usuario).toBe(id_b);
+    expect(pendiente_b.usuario.id_usuario).toBe(id_a);
+    // guardar_solicitud(id_mayor, id_menor) la envio id_mayor (id_emisor), sin
+    // importar el orden canonico solicitante/receptor.
+    expect(pendiente_a.enviada_por_mi).toBe(id_a === id_mayor);
+    expect(pendiente_b.enviada_por_mi).toBe(id_b === id_mayor);
+  });
+
   it('el CHECK impide una solicitud duplicada invertida', async () => {
     // Ya existe (menor, mayor); intentar de nuevo (invertido) viola UNIQUE.
     await expect(guardar_solicitud(id_b, id_a)).rejects.toThrow();
+  });
+
+  it('reactivar_solicitud vuelve a pendiente y actualiza id_emisor', async () => {
+    const id_c = await crear_usuario();
+    const id_d = await crear_usuario();
+    const rechazada = await guardar_solicitud(id_c, id_d);
+    await actualizar_estado(rechazada.id_solicitud, 'rechazado');
+
+    // d reenvia la solicitud que antes habia enviado c.
+    const reactivada = await reactivar_solicitud(rechazada.id_solicitud, id_d);
+
+    expect(reactivada.id_solicitud).toBe(rechazada.id_solicitud);
+    expect(reactivada.estado).toBe('pendiente');
+    expect(reactivada.id_emisor).toBe(id_d);
+    expect(reactivada.fecha_respuesta).toBeNull();
   });
 
   it('al aceptar, obtener_amigos devuelve el amigo para ambos usuarios', async () => {

@@ -69,7 +69,7 @@ function ItemNav({ seccion, activo, onClick }) {
         border: 'none',
         color,
         fontFamily: "'Silkscreen', monospace",
-        fontSize: '10px',
+        fontSize: '12px',
         letterSpacing: '0.12em',
         textShadow: activo ? '0 0 8px rgba(var(--glow-pink),.6)' : 'none',
       }}
@@ -106,7 +106,7 @@ export default function BarraNavegacion({ usuario, activo = 'inicio', al_navegar
           display: 'flex',
           justifyContent: 'space-between',
           fontFamily: "'Silkscreen', monospace",
-          fontSize: '8px',
+          fontSize: '10px',
           letterSpacing: '0.16em',
           color: 'var(--pink-faint)',
           padding: '0 4px 6px',
@@ -176,7 +176,7 @@ export default function BarraNavegacion({ usuario, activo = 'inicio', al_navegar
             }}
           >
             <GlifoPixel name="pawn" size={13} color="var(--celadon)" glow="var(--glow-cel)" />
-            <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '10px', letterSpacing: '0.10em', color: activo === 'perfil' ? 'var(--neon-pink)' : 'var(--petal-white)', textShadow: '0 0 6px rgba(var(--glow-pink),.5)' }}>
+            <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: '12px', letterSpacing: '0.10em', color: activo === 'perfil' ? 'var(--neon-pink)' : 'var(--petal-white)', textShadow: '0 0 6px rgba(var(--glow-pink),.5)' }}>
               {nombre}
             </div>
           </button>
@@ -192,7 +192,7 @@ export default function BarraNavegacion({ usuario, activo = 'inicio', al_navegar
               border: '1px solid rgba(var(--glow-neon),.35)',
               color: 'var(--pink-dim)',
               fontFamily: "'Silkscreen', monospace",
-              fontSize: '9px',
+              fontSize: '11px',
               letterSpacing: '0.10em',
             }}
           >

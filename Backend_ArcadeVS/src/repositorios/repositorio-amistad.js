@@ -8,14 +8,16 @@
  *
  * Nota de diseno: por el orden canonico, la columna id_solicitante guarda el
  * UUID menor, no necesariamente quien inicio la solicitud. La direccion real
- * (quien envio a quien) no se conserva en esta tabla.
+ * la guarda por separado la columna id_emisor (migracion 003): quien
+ * realmente inicio/reenvio la solicitud, para que el cliente distinga las que
+ * debe responder de las que ya envio.
  */
 
 import { consultar } from '../configuracion/configuracion-db.js';
 
 /** Columnas de la solicitud que se exponen en las lecturas. */
 const CAMPOS_SOLICITUD = `
-  id_solicitud, id_solicitante, id_receptor, estado, fecha_solicitud, fecha_respuesta
+  id_solicitud, id_solicitante, id_receptor, id_emisor, estado, fecha_solicitud, fecha_respuesta
 `;
 
 /**
@@ -32,19 +34,20 @@ export function ordenar_par_canonico(id_a, id_b) {
 
 /**
  * Crea una solicitud de amistad entre dos usuarios (estado 'pendiente').
- * Normaliza el orden canonico antes de insertar.
+ * Normaliza el orden canonico antes de insertar; id_emisor conserva quien
+ * realmente la inicio, sin importar el orden canonico de solicitante/receptor.
  *
- * @param {string} id_usuario_a - UUID de un usuario.
- * @param {string} id_usuario_b - UUID del otro usuario.
+ * @param {string} id_emisor - UUID de quien envia la solicitud.
+ * @param {string} id_destino - UUID de quien la recibe.
  * @returns {Promise<object>} La solicitud creada.
  */
-export async function guardar_solicitud(id_usuario_a, id_usuario_b) {
-  const [id_solicitante, id_receptor] = ordenar_par_canonico(id_usuario_a, id_usuario_b);
+export async function guardar_solicitud(id_emisor, id_destino) {
+  const [id_solicitante, id_receptor] = ordenar_par_canonico(id_emisor, id_destino);
   const filas = await consultar(
-    `INSERT INTO solicitudes_amistad (id_solicitante, id_receptor)
-     VALUES ($1, $2)
+    `INSERT INTO solicitudes_amistad (id_solicitante, id_receptor, id_emisor)
+     VALUES ($1, $2, $3)
      RETURNING ${CAMPOS_SOLICITUD}`,
-    [id_solicitante, id_receptor],
+    [id_solicitante, id_receptor, id_emisor],
   );
   return filas[0];
 }
@@ -100,6 +103,27 @@ export async function actualizar_estado(id_solicitud, estado) {
 }
 
 /**
+ * Reactiva una solicitud previamente rechazada/bloqueada a 'pendiente',
+ * registrando quien la reenvio (id_emisor) y refrescando la fecha. La
+ * restriccion UNIQUE (id_solicitante, id_receptor) impide crear una fila
+ * nueva para el mismo par, por eso se reutiliza la existente.
+ *
+ * @param {string} id_solicitud - UUID de la solicitud a reactivar.
+ * @param {string} id_emisor - UUID de quien reenvia la solicitud ahora.
+ * @returns {Promise<object|null>} La solicitud actualizada o null si no existe.
+ */
+export async function reactivar_solicitud(id_solicitud, id_emisor) {
+  const filas = await consultar(
+    `UPDATE solicitudes_amistad
+        SET estado = 'pendiente', id_emisor = $2, fecha_solicitud = NOW(), fecha_respuesta = NULL
+      WHERE id_solicitud = $1
+      RETURNING ${CAMPOS_SOLICITUD}`,
+    [id_solicitud, id_emisor],
+  );
+  return filas[0] ?? null;
+}
+
+/**
  * Lista los amigos confirmados (estado 'aceptado') de un usuario, con sus
  * datos publicos, sin importar de que lado del par esten.
  *
@@ -140,20 +164,49 @@ export async function contar_amigos(id_usuario) {
 }
 
 /**
- * Lista las solicitudes pendientes en las que participa un usuario.
+ * Lista las solicitudes pendientes en las que participa un usuario, con los
+ * datos publicos del otro participante (igual que obtener_amigos) para que el
+ * cliente pueda mostrar la solicitud sin una segunda consulta. Incluye
+ * `enviada_por_mi` (basado en id_emisor, no en el orden canonico) para que el
+ * cliente distinga las que debe responder (aceptar/rechazar) de las que ya
+ * envio y solo esta esperando. Es `null` en filas anteriores a la migracion
+ * 003, que no guardan quien inicio realmente la solicitud.
  *
  * @param {string} id_usuario - UUID del usuario.
- * @returns {Promise<Array<object>>} Solicitudes en estado 'pendiente'.
+ * @returns {Promise<Array<{id_solicitud: string, estado: string,
+ *          fecha_solicitud: string, enviada_por_mi: boolean, usuario: object}>>}
+ *          Solicitudes en estado 'pendiente'.
  */
 export async function obtener_solicitudes_pendientes(id_usuario) {
-  return consultar(
-    `SELECT ${CAMPOS_SOLICITUD}
-       FROM solicitudes_amistad
-      WHERE (id_solicitante = $1 OR id_receptor = $1)
-        AND estado = 'pendiente'
-      ORDER BY fecha_solicitud DESC`,
+  const filas = await consultar(
+    `SELECT s.id_solicitud, s.estado, s.fecha_solicitud,
+            (s.id_emisor = $1) AS enviada_por_mi,
+            u.id_usuario, u.nombre, u.apellido, u.codigo_amigo, u.avatar_url
+       FROM solicitudes_amistad s
+       JOIN usuarios u
+         ON u.id_usuario = CASE
+              WHEN s.id_solicitante = $1 THEN s.id_receptor
+              ELSE s.id_solicitante
+            END
+      WHERE (s.id_solicitante = $1 OR s.id_receptor = $1)
+        AND s.estado = 'pendiente'
+      ORDER BY s.fecha_solicitud DESC`,
     [id_usuario],
   );
+
+  return filas.map((fila) => ({
+    id_solicitud: fila.id_solicitud,
+    estado: fila.estado,
+    fecha_solicitud: fila.fecha_solicitud,
+    enviada_por_mi: fila.enviada_por_mi,
+    usuario: {
+      id_usuario: fila.id_usuario,
+      nombre: fila.nombre,
+      apellido: fila.apellido,
+      codigo_amigo: fila.codigo_amigo,
+      avatar_url: fila.avatar_url,
+    },
+  }));
 }
 
 /**
